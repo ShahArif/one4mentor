@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,14 +29,14 @@ const mentors = [
     name: "Sarah Chen",
     role: "Senior Software Engineer",
     company: "Google",
-    experience: "8 years",
+    experience: "8",
     rating: 4.9,
     reviews: 127,
     hourlyRate: 2500,
     skills: ["JavaScript", "React", "System Design"],
     location: "San Francisco, CA",
     availability: "Available",
-    bio: "Experienced full-stack developer with expertise in modern web technologies...",
+    bio: "Experienced full-stack developer with expertise in modern web technologies and cloud architecture.",
     avatar: "/api/placeholder/60/60",
     isBookmarked: false
   },
@@ -45,14 +45,14 @@ const mentors = [
     name: "Raj Patel",
     role: "Product Manager",
     company: "Microsoft",
-    experience: "6 years",
+    experience: "6",
     rating: 4.8,
     reviews: 89,
     hourlyRate: 2000,
     skills: ["Product Management", "Strategy", "Analytics"],
     location: "Seattle, WA",
     availability: "Available",
-    bio: "Product management leader with experience scaling products from 0 to millions...",
+    bio: "Product management leader with experience scaling products from 0 to millions of users.",
     avatar: "/api/placeholder/60/60",
     isBookmarked: true
   },
@@ -61,16 +61,64 @@ const mentors = [
     name: "Priya Sharma",
     role: "ML Engineer",
     company: "OpenAI",
-    experience: "5 years",
+    experience: "5",
     rating: 4.9,
     reviews: 156,
     hourlyRate: 3000,
     skills: ["Machine Learning", "Python", "Data Science"],
     location: "Remote",
     availability: "Busy",
-    bio: "Machine learning expert specializing in NLP and computer vision applications...",
+    bio: "Machine learning expert specializing in NLP and computer vision applications.",
     avatar: "/api/placeholder/60/60",
     isBookmarked: false
+  },
+  {
+    id: 4,
+    name: "Alex Johnson",
+    role: "DevOps Engineer",
+    company: "AWS",
+    experience: "7",
+    rating: 4.7,
+    reviews: 98,
+    hourlyRate: 2200,
+    skills: ["DevOps", "AWS", "Kubernetes"],
+    location: "Austin, TX",
+    availability: "Available",
+    bio: "Cloud infrastructure specialist with extensive experience in containerization and CI/CD.",
+    avatar: "/api/placeholder/60/60",
+    isBookmarked: false
+  },
+  {
+    id: 5,
+    name: "Emma Wilson",
+    role: "UX Designer",
+    company: "Figma",
+    experience: "4",
+    rating: 4.8,
+    reviews: 134,
+    hourlyRate: 1800,
+    skills: ["UI/UX Design", "Figma", "Design Systems"],
+    location: "New York, NY",
+    availability: "Available",
+    bio: "User experience designer focused on creating intuitive and accessible digital products.",
+    avatar: "/api/placeholder/60/60",
+    isBookmarked: false
+  },
+  {
+    id: 6,
+    name: "David Kim",
+    role: "Data Scientist",
+    company: "Netflix",
+    experience: "6",
+    rating: 4.9,
+    reviews: 76,
+    hourlyRate: 2800,
+    skills: ["Data Science", "Python", "Machine Learning"],
+    location: "Los Angeles, CA",
+    availability: "Available",
+    bio: "Data scientist with expertise in recommendation systems and predictive analytics.",
+    avatar: "/api/placeholder/60/60",
+    isBookmarked: true
   }
 ];
 
@@ -81,6 +129,59 @@ export default function MentorSearch() {
   const [experienceFilter, setExperienceFilter] = useState("");
   const [availabilityFilter, setAvailabilityFilter] = useState("");
   const [filteredMentors, setFilteredMentors] = useState(mentors);
+
+  // Filter mentors based on all criteria
+  useEffect(() => {
+    let filtered = mentors;
+
+    // Search filter
+    if (searchQuery) {
+      filtered = filtered.filter(mentor =>
+        mentor.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        mentor.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        mentor.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        mentor.skills.some(skill => skill.toLowerCase().includes(searchQuery.toLowerCase()))
+      );
+    }
+
+    // Skills filter
+    if (selectedSkills.length > 0) {
+      filtered = filtered.filter(mentor =>
+        selectedSkills.some(skill => mentor.skills.includes(skill))
+      );
+    }
+
+    // Price range filter
+    filtered = filtered.filter(mentor =>
+      mentor.hourlyRate >= priceRange[0] && mentor.hourlyRate <= priceRange[1]
+    );
+
+    // Experience filter
+    if (experienceFilter) {
+      filtered = filtered.filter(mentor => {
+        const mentorYears = parseInt(mentor.experience);
+        switch (experienceFilter) {
+          case "2-5":
+            return mentorYears >= 2 && mentorYears <= 5;
+          case "5-10":
+            return mentorYears >= 5 && mentorYears <= 10;
+          case "10+":
+            return mentorYears >= 10;
+          default:
+            return true;
+        }
+      });
+    }
+
+    // Availability filter
+    if (availabilityFilter) {
+      filtered = filtered.filter(mentor =>
+        mentor.availability.toLowerCase() === availabilityFilter.toLowerCase()
+      );
+    }
+
+    setFilteredMentors(filtered);
+  }, [searchQuery, selectedSkills, priceRange, experienceFilter, availabilityFilter]);
 
   const handleSkillToggle = (skill: string) => {
     setSelectedSkills(prev => 
@@ -98,6 +199,14 @@ export default function MentorSearch() {
           : mentor
       )
     );
+  };
+
+  const clearFilters = () => {
+    setSearchQuery("");
+    setSelectedSkills([]);
+    setPriceRange([0, 5000]);
+    setExperienceFilter("");
+    setAvailabilityFilter("");
   };
 
   return (
@@ -200,7 +309,7 @@ export default function MentorSearch() {
                   </Select>
                 </div>
 
-                <Button className="w-full" variant="outline">
+                <Button className="w-full" variant="outline" onClick={clearFilters}>
                   Clear Filters
                 </Button>
               </CardContent>
@@ -209,7 +318,33 @@ export default function MentorSearch() {
 
           {/* Mentor Cards */}
           <div className="lg:col-span-3">
-            <div className="space-y-6">
+            <div className="flex justify-between items-center mb-6">
+              <p className="text-muted-foreground">
+                Showing {filteredMentors.length} mentor{filteredMentors.length !== 1 ? 's' : ''}
+              </p>
+              <Select defaultValue="relevance">
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="relevance">Relevance</SelectItem>
+                  <SelectItem value="rating">Highest Rating</SelectItem>
+                  <SelectItem value="price-low">Price: Low to High</SelectItem>
+                  <SelectItem value="price-high">Price: High to Low</SelectItem>
+                  <SelectItem value="experience">Most Experience</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {filteredMentors.length === 0 ? (
+              <Card className="p-8 text-center">
+                <p className="text-muted-foreground mb-4">No mentors found matching your criteria</p>
+                <Button variant="outline" onClick={clearFilters}>
+                  Clear Filters
+                </Button>
+              </Card>
+            ) : (
+              <div className="space-y-6">
               {filteredMentors.map((mentor) => (
                 <Card key={mentor.id} className="hover:shadow-lg transition-shadow">
                   <CardContent className="p-6">
@@ -251,10 +386,10 @@ export default function MentorSearch() {
                             <span className="font-semibold">{mentor.rating}</span>
                             <span className="text-muted-foreground ml-1">({mentor.reviews} reviews)</span>
                           </div>
-                          <div className="flex items-center text-muted-foreground">
-                            <Clock className="h-4 w-4 mr-1" />
-                            <span>{mentor.experience} experience</span>
-                          </div>
+                            <div className="flex items-center text-muted-foreground">
+                              <Clock className="h-4 w-4 mr-1" />
+                              <span>{mentor.experience} years experience</span>
+                            </div>
                         </div>
                         
                         <p className="text-muted-foreground mb-4">{mentor.bio}</p>
@@ -290,7 +425,8 @@ export default function MentorSearch() {
                   </CardContent>
                 </Card>
               ))}
-            </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
