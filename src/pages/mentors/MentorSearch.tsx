@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -401,9 +402,11 @@ export default function MentorSearch() {
                         </div>
                         
                         <div className="flex items-center space-x-3">
-                          <Button className="bg-gradient-primary">
-                            Book Session
-                          </Button>
+                          <Link to={`/mentor/${mentor.id}`}>
+                            <Button className="bg-gradient-primary">
+                              View Profile
+                            </Button>
+                          </Link>
                           <Button variant="outline">
                             <MessageCircle className="h-4 w-4 mr-2" />
                             Message

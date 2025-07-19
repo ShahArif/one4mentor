@@ -12,6 +12,10 @@ import MentorOnboarding from "./pages/onboarding/MentorOnboarding";
 import CandidateDashboard from "./pages/dashboard/CandidateDashboard";
 import MentorDashboard from "./pages/dashboard/MentorDashboard";
 import MentorSearch from "./pages/mentors/MentorSearch";
+import MentorProfile from "./pages/mentors/MentorProfile";
+import SessionBooking from "./pages/booking/SessionBooking";
+import BookingConfirmation from "./pages/booking/BookingConfirmation";
+import SessionManagement from "./pages/sessions/SessionManagement";
 
 const queryClient = new QueryClient();
 
@@ -30,6 +34,10 @@ const App = () => (
           <Route path="/candidate/dashboard" element={<CandidateDashboard />} />
           <Route path="/mentor/dashboard" element={<MentorDashboard />} />
           <Route path="/mentors" element={<MentorSearch />} />
+          <Route path="/mentor/:id" element={<MentorProfile />} />
+          <Route path="/booking/:id" element={<SessionBooking />} />
+          <Route path="/booking-confirmation/:id" element={<BookingConfirmation />} />
+          <Route path="/sessions" element={<SessionManagement />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
