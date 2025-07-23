@@ -16,6 +16,11 @@ import MentorProfile from "./pages/mentors/MentorProfile";
 import SessionBooking from "./pages/booking/SessionBooking";
 import BookingConfirmation from "./pages/booking/BookingConfirmation";
 import SessionManagement from "./pages/sessions/SessionManagement";
+import ChatInterface from "./pages/chat/ChatInterface";
+import VideoCall from "./pages/video/VideoCall";
+import SessionFeedback from "./pages/feedback/SessionFeedback";
+import ReviewsRatings from "./pages/reviews/ReviewsRatings";
+import AnalyticsDashboard from "./pages/analytics/AnalyticsDashboard";
 
 const queryClient = new QueryClient();
 
@@ -38,6 +43,11 @@ const App = () => (
           <Route path="/booking/:id" element={<SessionBooking />} />
           <Route path="/booking-confirmation/:id" element={<BookingConfirmation />} />
           <Route path="/sessions" element={<SessionManagement />} />
+          <Route path="/chat" element={<ChatInterface />} />
+          <Route path="/video-call" element={<VideoCall />} />
+          <Route path="/session-feedback/:id" element={<SessionFeedback />} />
+          <Route path="/reviews" element={<ReviewsRatings />} />
+          <Route path="/analytics" element={<AnalyticsDashboard />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
