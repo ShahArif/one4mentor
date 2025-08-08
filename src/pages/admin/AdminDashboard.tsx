@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useLogout } from "@/hooks/use-logout";
-import { Loader2, ShieldCheck, Users, CheckCircle2, XCircle, LogOut } from "lucide-react";
+import { Loader2, ShieldCheck, Users, CheckCircle2, XCircle, LogOut, FileText } from "lucide-react";
 
 type AppRole = "super_admin" | "admin" | "mentor" | "candidate";
 
@@ -30,6 +30,7 @@ interface OnboardingRequest {
   data: any;
   status: "pending" | "approved" | "rejected";
   created_at: string;
+  type?: "mentor" | "candidate"; // Added for unified view
 }
 
 const roleColors: Record<AppRole, "secondary" | "default" | "destructive" | "outline" | "" | "" | any> = {
@@ -163,6 +164,35 @@ export default function AdminDashboard() {
     enabled: isAuthorized,
   });
 
+  // New query for all onboarding requests (both mentor and candidate)
+  const allOnboardingReqsQuery = useQuery({
+    queryKey: ["all_onboarding_requests"],
+    queryFn: async (): Promise<OnboardingRequest[]> => {
+      const [mentorRes, candidateRes] = await Promise.all([
+        supabase
+          .from("mentor_onboarding_requests")
+          .select("id,user_id,data,status,created_at")
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("candidate_onboarding_requests")
+          .select("id,user_id,data,status,created_at")
+          .order("created_at", { ascending: false }),
+      ]);
+
+      if (mentorRes.error) throw mentorRes.error;
+      if (candidateRes.error) throw candidateRes.error;
+
+      const mentorRequests = (mentorRes.data || []).map(req => ({ ...req, type: "mentor" as const }));
+      const candidateRequests = (candidateRes.data || []).map(req => ({ ...req, type: "candidate" as const }));
+
+      // Combine and sort by creation date
+      return [...mentorRequests, ...candidateRequests].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+    },
+    enabled: isAuthorized,
+  });
+
   const rolesByUser = useMemo(() => {
     const map = new Map<string, AppRole[]>();
     (rolesQuery.data || []).forEach(({ user_id, role }) => {
@@ -223,6 +253,7 @@ export default function AdminDashboard() {
     } else {
       toast({ title: `Request ${decision}` });
       queryClient.invalidateQueries({ queryKey: [type === "mentor" ? "mentor_requests" : "candidate_requests", "pending"] });
+      queryClient.invalidateQueries({ queryKey: ["all_onboarding_requests"] });
     }
   };
 
@@ -268,6 +299,7 @@ export default function AdminDashboard() {
       <Tabs defaultValue="users">
         <TabsList>
           <TabsTrigger value="users" className="flex items-center gap-2"><Users className="h-4 w-4"/> Users</TabsTrigger>
+          <TabsTrigger value="all-requests" className="flex items-center gap-2"><FileText className="h-4 w-4"/> All Requests</TabsTrigger>
           <TabsTrigger value="mentor">Mentor Requests</TabsTrigger>
           <TabsTrigger value="candidate">Candidate Requests</TabsTrigger>
         </TabsList>
@@ -314,6 +346,75 @@ export default function AdminDashboard() {
                                 </Button>
                               )
                             ))}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="all-requests" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>All Onboarding Requests</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                All registration onboarding requests from mentors and candidates
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Applicant</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Submitted</TableHead>
+                      <TableHead>Data</TableHead>
+                      <TableHead className="w-[220px]">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(allOnboardingReqsQuery.data || []).map((req) => {
+                      const prof = profilesById.get(req.user_id);
+                      const statusColor = req.status === "approved" ? "default" : req.status === "rejected" ? "destructive" : "secondary";
+                      return (
+                        <TableRow key={`${req.type}-${req.id}`}>
+                          <TableCell>
+                            <Badge variant={req.type === "mentor" ? "default" : "outline"}>
+                              {req.type === "mentor" ? "Mentor" : "Candidate"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{prof?.email || req.user_id}</TableCell>
+                          <TableCell>
+                            <Badge variant={statusColor}>{req.status}</Badge>
+                          </TableCell>
+                          <TableCell>{new Date(req.created_at).toLocaleString()}</TableCell>
+                          <TableCell>
+                            <pre className="text-xs text-muted-foreground max-w-md whitespace-pre-wrap break-words">
+                              {JSON.stringify(req.data, null, 2)}
+                            </pre>
+                          </TableCell>
+                          <TableCell className="space-x-2">
+                            {req.status === "pending" && (
+                              <>
+                                <Button size="sm" onClick={() => decideRequest(req.type!, req.id, "approved")}>
+                                  <CheckCircle2 className="h-4 w-4 mr-1"/> Approve
+                                </Button>
+                                <Button size="sm" variant="outline" onClick={() => decideRequest(req.type!, req.id, "rejected")}>
+                                  <XCircle className="h-4 w-4 mr-1"/> Reject
+                                </Button>
+                              </>
+                            )}
+                            {req.status !== "pending" && (
+                              <span className="text-sm text-muted-foreground">
+                                {req.status === "approved" ? "Approved" : "Rejected"}
+                              </span>
+                            )}
                           </TableCell>
                         </TableRow>
                       );

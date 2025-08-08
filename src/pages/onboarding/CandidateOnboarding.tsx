@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { User, Target, Upload, CheckCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 const skillOptions = [
   "JavaScript", "Python", "React", "Node.js", "Java", "Data Science",
@@ -20,7 +22,9 @@ const companiesOptions = [
 
 export default function CandidateOnboarding() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     fullName: "",
     bio: "",
@@ -63,10 +67,62 @@ export default function CandidateOnboarding() {
     }
   };
 
-  const handleComplete = () => {
-    // Save onboarding data
-    console.log("Onboarding completed:", formData);
-    navigate("/candidate/dashboard");
+  const handleComplete = async () => {
+    setIsSubmitting(true);
+    
+    try {
+      // Get the current user
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !user) {
+        toast({
+          title: "Authentication Error",
+          description: "Please log in to complete onboarding.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Prepare form data (excluding file for now, could be handled separately)
+      const submissionData = {
+        fullName: formData.fullName,
+        bio: formData.bio,
+        skills: formData.skills,
+        experience: formData.experience,
+        goals: formData.goals,
+        preferredCompanies: formData.preferredCompanies,
+        hasResume: formData.resume !== null
+      };
+
+      // Save onboarding data to Supabase
+      const { error } = await supabase
+        .from("candidate_onboarding_requests")
+        .insert({
+          user_id: user.id,
+          data: submissionData,
+          status: "pending"
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      toast({
+        title: "Application Submitted",
+        description: "Your candidate application has been submitted for review. You'll be notified once it's approved.",
+      });
+
+      navigate("/dashboard");
+    } catch (error: any) {
+      console.error("Error submitting candidate application:", error);
+      toast({
+        title: "Submission Failed",
+        description: error.message || "Failed to submit application. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const renderStep = () => {
@@ -214,39 +270,46 @@ export default function CandidateOnboarding() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-subtle flex items-center justify-center p-4">
-      <Card className="w-full max-w-2xl">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Candidate Onboarding</CardTitle>
-          <Progress value={progress} className="mt-4" />
-          <p className="text-sm text-muted-foreground">Step {currentStep} of 4</p>
-        </CardHeader>
-        
-        <CardContent>
-          {renderStep()}
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50">
+      <div className="container max-w-2xl py-10">
+        <Card className="shadow-xl border-0">
+          <CardHeader className="text-center pb-8">
+            <CardTitle className="text-3xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">
+              Candidate Onboarding
+            </CardTitle>
+            <Progress value={progress} className="mt-4" />
+            <p className="text-sm text-muted-foreground mt-2">Step {currentStep} of 4</p>
+          </CardHeader>
           
-          <div className="flex justify-between mt-8">
-            <Button
-              variant="outline"
-              onClick={handlePrevious}
-              disabled={currentStep === 1}
-            >
-              Previous
-            </Button>
+          <CardContent>
+            {renderStep()}
             
-            {currentStep === 4 ? (
-              <Button onClick={handleComplete} className="bg-gradient-primary">
-                <CheckCircle className="h-4 w-4 mr-2" />
-                Complete Setup
-              </Button>
-            ) : (
-              <Button onClick={handleNext} className="bg-gradient-primary">
-                Next
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+            <div className="flex justify-between mt-8">
+              {currentStep > 1 && (
+                <Button variant="outline" onClick={handlePrevious}>
+                  Previous
+                </Button>
+              )}
+              
+              <div className="ml-auto">
+                {currentStep < 4 ? (
+                  <Button onClick={handleNext} className="btn-gradient">
+                    Next
+                  </Button>
+                ) : (
+                  <Button 
+                    onClick={handleComplete} 
+                    className="btn-gradient"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? "Submitting..." : "Complete Application"}
+                  </Button>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
