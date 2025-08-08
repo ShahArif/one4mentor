@@ -405,10 +405,10 @@ const MentorProfile = () => {
 
                 {/* Quick Stats */}
                 <div className="pt-4 border-t space-y-2">
-                                      <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Response time</span>
-                      <span className="font-medium">&lt; 2 hours</span>
-                    </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Response time</span>
+                    <span className="font-medium">&lt; 2 hours</span>
+                  </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Sessions completed</span>
                     <span className="font-medium">100+</span>
