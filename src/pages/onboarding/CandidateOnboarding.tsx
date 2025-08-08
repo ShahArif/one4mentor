@@ -270,11 +270,11 @@ export default function CandidateOnboarding() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100">
       <div className="container max-w-2xl py-10">
         <Card className="shadow-xl border-0">
           <CardHeader className="text-center pb-8">
-            <CardTitle className="text-3xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">
+            <CardTitle className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
               Candidate Onboarding
             </CardTitle>
             <Progress value={progress} className="mt-4" />
