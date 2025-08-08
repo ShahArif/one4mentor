@@ -52,7 +52,9 @@ export default function Login() {
 
       if (!error && roles && roles.length > 0) {
         const roleValues = roles.map((r: any) => r.role);
-        if (roleValues.includes("mentor")) {
+        if (roleValues.includes("super_admin") || roleValues.includes("admin")) {
+          target = "/admin/dashboard";
+        } else if (roleValues.includes("mentor")) {
           target = "/mentor/dashboard";
         } else if (roleValues.includes("candidate")) {
           target = "/candidate/dashboard";

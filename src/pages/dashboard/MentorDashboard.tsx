@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useLogout } from "@/hooks/use-logout";
+import { ProtectedRoute } from "@/components/layout/ProtectedRoute";
+import { useAuth } from "@/hooks/use-auth";
 
 const pendingRequests = [
   {
@@ -79,8 +81,11 @@ const activeCandidates = [
   }
 ];
 
-export default function MentorDashboard() {
+function MentorDashboardInner() {
   const { logout } = useLogout();
+  const { profile } = useAuth();
+  const displayName = profile?.display_name || profile?.email || "there";
+
   return (
     <div className="min-h-screen bg-gradient-subtle">
       {/* Header */}
@@ -88,7 +93,7 @@ export default function MentorDashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between py-6">
             <div>
-              <h1 className="text-3xl font-bold">Welcome back, Sarah!</h1>
+              <h1 className="text-3xl font-bold">Welcome back, {displayName}!</h1>
               <p className="text-muted-foreground">Manage your mentoring sessions</p>
             </div>
             <div className="flex items-center space-x-4">
@@ -310,5 +315,13 @@ export default function MentorDashboard() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function MentorDashboard() {
+  return (
+    <ProtectedRoute requiredRoles={["mentor"]}>
+      <MentorDashboardInner />
+    </ProtectedRoute>
   );
 }
