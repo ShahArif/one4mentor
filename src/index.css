@@ -39,6 +39,12 @@ All colors MUST be HSL.
     --warning: 25 95% 53%;
     --warning-foreground: 255 255 255;
 
+    /* Gold: Elegant gold for ratings and highlights */
+    --gold: 41 96% 40%;
+    --gold-foreground: 255 255 255;
+    --gold-light: 48 96% 53%;
+    --gold-muted: 41 96% 85%;
+
     --destructive: 0 84% 60%;
     --destructive-foreground: 255 255 255;
 
@@ -102,6 +108,12 @@ All colors MUST be HSL.
     --accent: 217.2 32.6% 17.5%;
     --accent-foreground: 210 40% 98%;
 
+    /* Gold: Elegant gold for ratings and highlights (dark theme) */
+    --gold: 41 96% 50%;
+    --gold-foreground: 41 96% 15%;
+    --gold-light: 48 96% 65%;
+    --gold-muted: 41 96% 25%;
+
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
 
@@ -163,6 +175,23 @@ All colors MUST be HSL.
   
   .transition-spring {
     transition: var(--transition-spring);
+  }
+
+  /* Gold utility classes */
+  .text-gold {
+    color: hsl(var(--gold));
+  }
+  
+  .fill-gold {
+    fill: hsl(var(--gold));
+  }
+  
+  .bg-gold {
+    background-color: hsl(var(--gold));
+  }
+  
+  .border-gold {
+    border-color: hsl(var(--gold));
   }
 }
 

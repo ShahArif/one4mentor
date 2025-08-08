@@ -64,7 +64,7 @@ const MentorProfile = () => {
                   
                   <div className="flex flex-wrap gap-4 mb-4">
                     <div className="flex items-center gap-1">
-                      <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                      <Star className="w-4 h-4 fill-gold text-gold" />
                       <span className="font-semibold">{mentorData.rating}</span>
                       <span className="text-muted-foreground">({mentorData.reviewCount} reviews)</span>
                     </div>
@@ -166,7 +166,7 @@ const MentorProfile = () => {
                               <h4 className="font-semibold">John Doe</h4>
                               <div className="flex">
                                 {[1, 2, 3, 4, 5].map((star) => (
-                                  <Star key={star} className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                                  <Star key={star} className="w-4 h-4 fill-gold text-gold" />
                                 ))}
                               </div>
                             </div>
