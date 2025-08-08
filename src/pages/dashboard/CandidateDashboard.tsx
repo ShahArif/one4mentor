@@ -11,9 +11,11 @@ import {
   Target,
   TrendingUp,
   Users,
-  Bell
+  Bell,
+  LogOut
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useLogout } from "@/hooks/use-logout";
 
 const upcomingSessions = [
   {
@@ -57,6 +59,7 @@ const learningProgress = [
 ];
 
 export default function CandidateDashboard() {
+  const { logout } = useLogout();
   return (
     <div className="min-h-screen bg-gradient-subtle">
       {/* Header */}
@@ -67,10 +70,16 @@ export default function CandidateDashboard() {
               <h1 className="text-3xl font-bold">Welcome back, Alex!</h1>
               <p className="text-muted-foreground">Continue your learning journey</p>
             </div>
-            <Button className="bg-gradient-primary">
-              <Bell className="h-4 w-4 mr-2" />
-              3 New
-            </Button>
+            <div className="flex items-center gap-3">
+              <Button className="bg-gradient-primary">
+                <Bell className="h-4 w-4 mr-2" />
+                3 New
+              </Button>
+              <Button variant="outline" onClick={logout}>
+                <LogOut className="h-4 w-4 mr-2" />
+                Sign out
+              </Button>
+            </div>
           </div>
         </div>
       </div>

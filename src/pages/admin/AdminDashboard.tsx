@@ -7,7 +7,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, ShieldCheck, Users, CheckCircle2, XCircle } from "lucide-react";
+import { useLogout } from "@/hooks/use-logout";
+import { Loader2, ShieldCheck, Users, CheckCircle2, XCircle, LogOut } from "lucide-react";
 
 type AppRole = "super_admin" | "admin" | "mentor" | "candidate";
 
@@ -44,6 +45,7 @@ export default function AdminDashboard() {
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const { logout } = useLogout();
 
   // Auth + role gate
   useEffect(() => {
@@ -252,9 +254,15 @@ export default function AdminDashboard() {
 
   return (
     <main className="container py-8">
-      <header className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
-        <p className="text-muted-foreground">Manage users and approve onboarding requests.</p>
+      <header className="mb-8 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
+          <p className="text-muted-foreground">Manage users and approve onboarding requests.</p>
+        </div>
+        <Button variant="outline" onClick={logout}>
+          <LogOut className="h-4 w-4 mr-2" />
+          Sign out
+        </Button>
       </header>
 
       <Tabs defaultValue="users">

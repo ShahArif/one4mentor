@@ -12,9 +12,11 @@ import {
   TrendingUp,
   Bell,
   CheckCircle,
-  X
+  X,
+  LogOut
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useLogout } from "@/hooks/use-logout";
 
 const pendingRequests = [
   {
@@ -78,6 +80,7 @@ const activeCandidates = [
 ];
 
 export default function MentorDashboard() {
+  const { logout } = useLogout();
   return (
     <div className="min-h-screen bg-gradient-subtle">
       {/* Header */}
@@ -94,6 +97,10 @@ export default function MentorDashboard() {
                 2 Requests
               </Button>
               <Badge variant="secondary">Verified Mentor</Badge>
+              <Button variant="outline" onClick={logout}>
+                <LogOut className="h-4 w-4 mr-2" />
+                Sign out
+              </Button>
             </div>
           </div>
         </div>
