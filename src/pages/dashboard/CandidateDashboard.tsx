@@ -61,7 +61,7 @@ const learningProgress = [
 export default function CandidateDashboard() {
   const { logout } = useLogout();
   return (
-    <div className="min-h-screen bg-gradient-subtle">
+    <div className="min-h-screen bg-gradient-hero">
       {/* Header */}
       <div className="bg-background border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -71,6 +71,12 @@ export default function CandidateDashboard() {
               <p className="text-muted-foreground">Continue your learning journey</p>
             </div>
             <div className="flex items-center gap-3">
+              <Button asChild className="btn-gradient">
+                <Link to="/mentors">
+                  <Users className="h-4 w-4 mr-2" />
+                  Find Mentors
+                </Link>
+              </Button>
               <Button className="bg-gradient-primary">
                 <Bell className="h-4 w-4 mr-2" />
                 3 New
@@ -78,6 +84,32 @@ export default function CandidateDashboard() {
               <Button variant="outline" onClick={logout}>
                 <LogOut className="h-4 w-4 mr-2" />
                 Sign out
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Hero CTA for Finding Mentors */}
+      <div className="bg-gradient-primary text-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold mb-2">🚀 Ready to Level Up Your Career?</h2>
+            <p className="text-white/90 mb-4 max-w-2xl mx-auto">
+              Connect with industry experts, get personalized guidance, and accelerate your professional growth
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Button asChild size="lg" variant="secondary" className="text-lg px-8">
+                <Link to="/mentors">
+                  <Users className="h-5 w-5 mr-2" />
+                  Browse Mentors
+                </Link>
+              </Button>
+              <Button asChild size="lg" variant="outline" className="text-lg px-8 border-white text-white hover:bg-white hover:text-primary">
+                <Link to="/sessions">
+                  <Calendar className="h-5 w-5 mr-2" />
+                  My Sessions
+                </Link>
               </Button>
             </div>
           </div>

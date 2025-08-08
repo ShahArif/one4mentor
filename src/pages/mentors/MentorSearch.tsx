@@ -1,10 +1,13 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useToast } from "@/hooks/use-toast";
 import { 
   Search, 
   Filter, 
@@ -13,7 +16,10 @@ import {
   Clock,
   Heart,
   MessageCircle,
-  Briefcase
+  Briefcase,
+  ArrowLeft,
+  Users,
+  Loader2
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -24,165 +30,122 @@ const skillFilters = [
   "Machine Learning", "UI/UX Design", "Product Management", "DevOps"
 ];
 
-const mentors = [
-  {
-    id: 1,
-    name: "Sarah Chen",
-    role: "Senior Software Engineer",
-    company: "Google",
-    experience: "8",
-    rating: 4.9,
-    reviews: 127,
-    hourlyRate: 2500,
-    skills: ["JavaScript", "React", "System Design"],
-    location: "San Francisco, CA",
-    availability: "Available",
-    bio: "Experienced full-stack developer with expertise in modern web technologies and cloud architecture.",
-    avatar: "/api/placeholder/60/60",
-    isBookmarked: false
-  },
-  {
-    id: 2,
-    name: "Raj Patel",
-    role: "Product Manager",
-    company: "Microsoft",
-    experience: "6",
-    rating: 4.8,
-    reviews: 89,
-    hourlyRate: 2000,
-    skills: ["Product Management", "Strategy", "Analytics"],
-    location: "Seattle, WA",
-    availability: "Available",
-    bio: "Product management leader with experience scaling products from 0 to millions of users.",
-    avatar: "/api/placeholder/60/60",
-    isBookmarked: true
-  },
-  {
-    id: 3,
-    name: "Priya Sharma",
-    role: "ML Engineer",
-    company: "OpenAI",
-    experience: "5",
-    rating: 4.9,
-    reviews: 156,
-    hourlyRate: 3000,
-    skills: ["Machine Learning", "Python", "Data Science"],
-    location: "Remote",
-    availability: "Busy",
-    bio: "Machine learning expert specializing in NLP and computer vision applications.",
-    avatar: "/api/placeholder/60/60",
-    isBookmarked: false
-  },
-  {
-    id: 4,
-    name: "Alex Johnson",
-    role: "DevOps Engineer",
-    company: "AWS",
-    experience: "7",
-    rating: 4.7,
-    reviews: 98,
-    hourlyRate: 2200,
-    skills: ["DevOps", "AWS", "Kubernetes"],
-    location: "Austin, TX",
-    availability: "Available",
-    bio: "Cloud infrastructure specialist with extensive experience in containerization and CI/CD.",
-    avatar: "/api/placeholder/60/60",
-    isBookmarked: false
-  },
-  {
-    id: 5,
-    name: "Emma Wilson",
-    role: "UX Designer",
-    company: "Figma",
-    experience: "4",
-    rating: 4.8,
-    reviews: 134,
-    hourlyRate: 1800,
-    skills: ["UI/UX Design", "Figma", "Design Systems"],
-    location: "New York, NY",
-    availability: "Available",
-    bio: "User experience designer focused on creating intuitive and accessible digital products.",
-    avatar: "/api/placeholder/60/60",
-    isBookmarked: false
-  },
-  {
-    id: 6,
-    name: "David Kim",
-    role: "Data Scientist",
-    company: "Netflix",
-    experience: "6",
-    rating: 4.9,
-    reviews: 76,
-    hourlyRate: 2800,
-    skills: ["Data Science", "Python", "Machine Learning"],
-    location: "Los Angeles, CA",
-    availability: "Available",
-    bio: "Data scientist with expertise in recommendation systems and predictive analytics.",
-    avatar: "/api/placeholder/60/60",
-    isBookmarked: true
-  }
-];
+interface MentorProfile {
+  id: string;
+  email: string;
+  display_name: string;
+  created_at: string;
+  mentor_data?: {
+    fullName?: string;
+    currentRole?: string;
+    company?: string;
+    bio?: string;
+    skills?: string[];
+    hourlyRate?: string;
+    availability?: string[];
+    linkedinProfile?: string;
+    experience?: string;
+  };
+}
 
 export default function MentorSearch() {
-  const [searchQuery, setSearchQuery] = useState("");
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [searchTerm, setSearchTerm] = useState("");
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [priceRange, setPriceRange] = useState([0, 5000]);
-  const [experienceFilter, setExperienceFilter] = useState("");
-  const [availabilityFilter, setAvailabilityFilter] = useState("");
-  const [filteredMentors, setFilteredMentors] = useState(mentors);
+  const [experienceFilter, setExperienceFilter] = useState("all");
+  const [availabilityFilter, setAvailabilityFilter] = useState("all");
+  const [showFilters, setShowFilters] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [bookmarkedMentors, setBookmarkedMentors] = useState<Set<string>>(new Set());
 
-  // Filter mentors based on all criteria
+  // Check authentication and user role
   useEffect(() => {
-    let filtered = mentors;
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        toast({
+          title: "Authentication Required",
+          description: "Please log in to search for mentors.",
+          variant: "destructive",
+        });
+        navigate("/auth/login");
+        return;
+      }
 
-    // Search filter
-    if (searchQuery) {
-      filtered = filtered.filter(mentor =>
-        mentor.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        mentor.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        mentor.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        mentor.skills.some(skill => skill.toLowerCase().includes(searchQuery.toLowerCase()))
-      );
-    }
+      // Check if user has candidate role
+      const { data: roles } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id);
 
-    // Skills filter
-    if (selectedSkills.length > 0) {
-      filtered = filtered.filter(mentor =>
-        selectedSkills.some(skill => mentor.skills.includes(skill))
-      );
-    }
+      const userRoles = roles?.map(r => r.role) || [];
+      setUserRole(userRoles[0] || null);
+      
+      if (!userRoles.includes("candidate") && !userRoles.includes("admin") && !userRoles.includes("super_admin")) {
+        toast({
+          title: "Access Restricted",
+          description: "This feature is available for candidates. Please complete your candidate onboarding.",
+          variant: "destructive",
+        });
+        navigate("/onboarding/candidate");
+        return;
+      }
 
-    // Price range filter
-    filtered = filtered.filter(mentor =>
-      mentor.hourlyRate >= priceRange[0] && mentor.hourlyRate <= priceRange[1]
-    );
+      setIsAuthenticated(true);
+    };
 
-    // Experience filter
-    if (experienceFilter) {
-      filtered = filtered.filter(mentor => {
-        const mentorYears = parseInt(mentor.experience);
-        switch (experienceFilter) {
-          case "2-5":
-            return mentorYears >= 2 && mentorYears <= 5;
-          case "5-10":
-            return mentorYears >= 5 && mentorYears <= 10;
-          case "10+":
-            return mentorYears >= 10;
-          default:
-            return true;
-        }
-      });
-    }
+    checkAuth();
+  }, [navigate, toast]);
 
-    // Availability filter
-    if (availabilityFilter) {
-      filtered = filtered.filter(mentor =>
-        mentor.availability.toLowerCase() === availabilityFilter.toLowerCase()
-      );
-    }
+  // Fetch mentors from Supabase
+  const mentorsQuery = useQuery({
+    queryKey: ["mentors"],
+    queryFn: async (): Promise<MentorProfile[]> => {
+      // First get all users with mentor role
+      const { data: mentorRoles, error: rolesError } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "mentor");
 
-    setFilteredMentors(filtered);
-  }, [searchQuery, selectedSkills, priceRange, experienceFilter, availabilityFilter]);
+      if (rolesError) throw rolesError;
+
+      if (!mentorRoles || mentorRoles.length === 0) {
+        return [];
+      }
+
+      const mentorIds = mentorRoles.map(r => r.user_id);
+
+      // Get profiles for these mentors
+      const { data: profiles, error: profilesError } = await supabase
+        .from("profiles")
+        .select("*")
+        .in("id", mentorIds);
+
+      if (profilesError) throw profilesError;
+
+      // Get mentor onboarding data for approved mentors
+      const { data: mentorData, error: mentorDataError } = await supabase
+        .from("mentor_onboarding_requests")
+        .select("user_id, data")
+        .eq("status", "approved")
+        .in("user_id", mentorIds);
+
+      if (mentorDataError) throw mentorDataError;
+
+      // Combine profile and mentor data
+      const mentorDataMap = new Map(mentorData?.map(m => [m.user_id, m.data]) || []);
+
+      return profiles?.map(profile => ({
+        ...profile,
+        mentor_data: mentorDataMap.get(profile.id) || {}
+      })) || [];
+    },
+    enabled: isAuthenticated,
+  });
 
   const handleSkillToggle = (skill: string) => {
     setSelectedSkills(prev => 
@@ -192,242 +155,269 @@ export default function MentorSearch() {
     );
   };
 
-  const handleBookmark = (mentorId: number) => {
-    setFilteredMentors(prev => 
-      prev.map(mentor => 
-        mentor.id === mentorId 
-          ? { ...mentor, isBookmarked: !mentor.isBookmarked }
-          : mentor
-      )
-    );
+  const handleBookmark = (mentorId: string) => {
+    setBookmarkedMentors(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(mentorId)) {
+        newSet.delete(mentorId);
+        toast({ title: "Removed from bookmarks" });
+      } else {
+        newSet.add(mentorId);
+        toast({ title: "Added to bookmarks" });
+      }
+      return newSet;
+    });
   };
 
-  const clearFilters = () => {
-    setSearchQuery("");
-    setSelectedSkills([]);
-    setPriceRange([0, 5000]);
-    setExperienceFilter("");
-    setAvailabilityFilter("");
-  };
+  const filteredMentors = mentorsQuery.data?.filter(mentor => {
+    const mentorData = mentor.mentor_data || {};
+    const searchableText = `${mentor.display_name} ${mentorData.fullName} ${mentorData.currentRole} ${mentorData.company} ${mentorData.bio}`.toLowerCase();
+    
+    // Search term filter
+    if (searchTerm && !searchableText.includes(searchTerm.toLowerCase())) {
+      return false;
+    }
+    
+    // Skills filter
+    if (selectedSkills.length > 0) {
+      const mentorSkills = mentorData.skills || [];
+      if (!selectedSkills.some(skill => mentorSkills.includes(skill))) {
+        return false;
+      }
+    }
+    
+    // Experience filter
+    if (experienceFilter !== "all") {
+      const experience = parseInt(mentorData.experience || "0");
+      switch (experienceFilter) {
+        case "entry": return experience < 3;
+        case "mid": return experience >= 3 && experience <= 7;
+        case "senior": return experience > 7;
+        default: return true;
+      }
+    }
+
+    return true;
+  }) || [];
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="flex items-center space-x-2">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span>Checking authentication...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-subtle">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="min-h-screen bg-gradient-hero">
+      <div className="container py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-4">Find Your Perfect Mentor</h1>
-          <p className="text-muted-foreground">Connect with industry experts to accelerate your career</p>
-        </div>
-
-        {/* Search Bar */}
-        <div className="mb-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-            <Input
-              placeholder="Search mentors by name, company, or skills..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 pr-4 py-3 text-lg"
-            />
+          <div className="flex items-center mb-4">
+            <Button 
+              variant="ghost" 
+              onClick={() => navigate(-1)}
+              className="mr-4"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
+            <div>
+              <h1 className="text-3xl font-bold">Find Your Perfect Mentor</h1>
+              <p className="text-muted-foreground">
+                Connect with industry experts to accelerate your career
+              </p>
+            </div>
           </div>
-        </div>
+          
+          {/* Search and Filter Bar */}
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search mentors by name, company, or skills..."
+                className="pl-10"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => setShowFilters(!showFilters)}
+              className="flex items-center"
+            >
+              <Filter className="h-4 w-4 mr-2" />
+              Filters
+            </Button>
+          </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Filters Sidebar */}
-          <div className="lg:col-span-1">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Filter className="h-5 w-5 mr-2" />
-                  Filters
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Skills Filter */}
-                <div>
-                  <h4 className="font-semibold mb-3">Skills</h4>
-                  <div className="space-y-2">
-                    {skillFilters.map((skill) => (
-                      <div key={skill} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={skill}
-                          checked={selectedSkills.includes(skill)}
-                          onCheckedChange={() => handleSkillToggle(skill)}
-                        />
-                        <label htmlFor={skill} className="text-sm">{skill}</label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Experience Filter */}
-                <div>
-                  <h4 className="font-semibold mb-3">Experience</h4>
-                  <Select value={experienceFilter} onValueChange={setExperienceFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Any experience" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">Any experience</SelectItem>
-                      <SelectItem value="2-5">2-5 years</SelectItem>
-                      <SelectItem value="5-10">5-10 years</SelectItem>
-                      <SelectItem value="10+">10+ years</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Price Range */}
-                <div>
-                  <h4 className="font-semibold mb-3">Hourly Rate (₹)</h4>
-                  <div className="px-2">
-                    <Slider
-                      value={priceRange}
-                      onValueChange={setPriceRange}
-                      max={5000}
-                      min={0}
-                      step={100}
-                      className="w-full"
-                    />
-                    <div className="flex justify-between text-sm text-muted-foreground mt-2">
-                      <span>₹{priceRange[0]}</span>
-                      <span>₹{priceRange[1]}</span>
+          {/* Filters Panel */}
+          {showFilters && (
+            <Card className="mt-4">
+              <CardContent className="pt-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* Skills Filter */}
+                  <div>
+                    <h3 className="font-medium mb-3">Skills</h3>
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {skillFilters.map(skill => (
+                        <div key={skill} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={skill}
+                            checked={selectedSkills.includes(skill)}
+                            onCheckedChange={() => handleSkillToggle(skill)}
+                          />
+                          <label htmlFor={skill} className="text-sm">{skill}</label>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                </div>
 
-                {/* Availability */}
-                <div>
-                  <h4 className="font-semibold mb-3">Availability</h4>
-                  <Select value={availabilityFilter} onValueChange={setAvailabilityFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Any availability" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">Any availability</SelectItem>
-                      <SelectItem value="available">Available</SelectItem>
-                      <SelectItem value="busy">Busy</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                  {/* Experience Filter */}
+                  <div>
+                    <h3 className="font-medium mb-3">Experience Level</h3>
+                    <Select value={experienceFilter} onValueChange={setExperienceFilter}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Levels</SelectItem>
+                        <SelectItem value="entry">Entry (0-3 years)</SelectItem>
+                        <SelectItem value="mid">Mid (3-7 years)</SelectItem>
+                        <SelectItem value="senior">Senior (7+ years)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                <Button className="w-full" variant="outline" onClick={clearFilters}>
-                  Clear Filters
-                </Button>
+                  {/* Availability Filter */}
+                  <div>
+                    <h3 className="font-medium mb-3">Availability</h3>
+                    <Select value={availabilityFilter} onValueChange={setAvailabilityFilter}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Any Time</SelectItem>
+                        <SelectItem value="weekdays">Weekdays</SelectItem>
+                        <SelectItem value="weekends">Weekends</SelectItem>
+                        <SelectItem value="flexible">Flexible</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
               </CardContent>
             </Card>
-          </div>
+          )}
+        </div>
 
-          {/* Mentor Cards */}
-          <div className="lg:col-span-3">
-            <div className="flex justify-between items-center mb-6">
-              <p className="text-muted-foreground">
-                Showing {filteredMentors.length} mentor{filteredMentors.length !== 1 ? 's' : ''}
-              </p>
-              <Select defaultValue="relevance">
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="Sort by" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="relevance">Relevance</SelectItem>
-                  <SelectItem value="rating">Highest Rating</SelectItem>
-                  <SelectItem value="price-low">Price: Low to High</SelectItem>
-                  <SelectItem value="price-high">Price: High to Low</SelectItem>
-                  <SelectItem value="experience">Most Experience</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            {filteredMentors.length === 0 ? (
-              <Card className="p-8 text-center">
-                <p className="text-muted-foreground mb-4">No mentors found matching your criteria</p>
-                <Button variant="outline" onClick={clearFilters}>
-                  Clear Filters
-                </Button>
+        {/* Results */}
+        <div className="grid lg:grid-cols-4 gap-6">
+          <div className="lg:col-span-4">
+            {mentorsQuery.isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="flex items-center space-x-2">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                  <span>Loading mentors...</span>
+                </div>
+              </div>
+            ) : filteredMentors.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <h3 className="text-lg font-medium mb-2">No mentors found</h3>
+                  <p className="text-muted-foreground">
+                    {mentorsQuery.data?.length === 0 
+                      ? "No approved mentors are available yet. Check back later!"
+                      : "Try adjusting your search criteria or filters."}
+                  </p>
+                </CardContent>
               </Card>
             ) : (
-              <div className="space-y-6">
-              {filteredMentors.map((mentor) => (
-                <Card key={mentor.id} className="hover:shadow-lg transition-shadow">
-                  <CardContent className="p-6">
-                    <div className="flex items-start space-x-4">
-                      <Avatar className="h-16 w-16">
-                        <AvatarImage src={mentor.avatar} />
-                        <AvatarFallback>{mentor.name[0]}</AvatarFallback>
-                      </Avatar>
-                      
-                      <div className="flex-1">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <h3 className="text-xl font-bold">{mentor.name}</h3>
-                            <div className="flex items-center text-muted-foreground mb-2">
-                              <Briefcase className="h-4 w-4 mr-1" />
-                              <span>{mentor.role} at {mentor.company}</span>
-                            </div>
-                            <div className="flex items-center text-muted-foreground mb-2">
-                              <MapPin className="h-4 w-4 mr-1" />
-                              <span>{mentor.location}</span>
-                            </div>
+              <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {filteredMentors.map((mentor) => {
+                  const mentorData = mentor.mentor_data || {};
+                  const isBookmarked = bookmarkedMentors.has(mentor.id);
+                  
+                  return (
+                    <Card key={mentor.id} className="card-hover">
+                      <CardContent className="p-6">
+                        <div className="flex items-start space-x-4 mb-4">
+                          <Avatar className="h-16 w-16">
+                            <AvatarImage src={`https://avatar.vercel.sh/${mentor.email}`} />
+                            <AvatarFallback>
+                              {(mentorData.fullName || mentor.display_name || mentor.email)
+                                .split(' ')
+                                .map(n => n[0])
+                                .join('')
+                                .toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold text-lg truncate">
+                              {mentorData.fullName || mentor.display_name || 'Anonymous Mentor'}
+                            </h3>
+                            <p className="text-sm text-muted-foreground">
+                              {mentorData.currentRole || 'Professional Mentor'}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {mentorData.company || 'Industry Expert'}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="space-y-3">
+                          <div className="flex items-center text-sm text-muted-foreground">
+                            <Briefcase className="h-4 w-4 mr-2" />
+                            {mentorData.experience || '0'}+ years experience
                           </div>
                           
-                          <div className="text-right">
-                            <p className="text-2xl font-bold">₹{mentor.hourlyRate}</p>
-                            <p className="text-sm text-muted-foreground">per hour</p>
-                            <Badge 
-                              variant={mentor.availability === "Available" ? "default" : "secondary"}
-                              className="mt-2"
-                            >
-                              {mentor.availability}
-                            </Badge>
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center mb-3">
-                          <div className="flex items-center mr-4">
-                            <Star className="h-4 w-4 fill-primary text-primary mr-1" />
-                            <span className="font-semibold">{mentor.rating}</span>
-                            <span className="text-muted-foreground ml-1">({mentor.reviews} reviews)</span>
-                          </div>
-                            <div className="flex items-center text-muted-foreground">
-                              <Clock className="h-4 w-4 mr-1" />
-                              <span>{mentor.experience} years experience</span>
+                          {mentorData.hourlyRate && (
+                            <div className="flex items-center text-sm">
+                              <span className="font-medium">₹{mentorData.hourlyRate}/hour</span>
                             </div>
-                        </div>
-                        
-                        <p className="text-muted-foreground mb-4">{mentor.bio}</p>
-                        
-                        <div className="flex flex-wrap gap-2 mb-4">
-                          {mentor.skills.map((skill) => (
-                            <Badge key={skill} variant="outline">{skill}</Badge>
-                          ))}
-                        </div>
-                        
-                        <div className="flex items-center space-x-3">
-                          <Link to={`/mentor/${mentor.id}`}>
-                            <Button className="bg-gradient-primary">
-                              View Profile
+                          )}
+
+                          {mentorData.skills && mentorData.skills.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {mentorData.skills.slice(0, 3).map((skill: string) => (
+                                <Badge key={skill} variant="outline" className="text-xs">
+                                  {skill}
+                                </Badge>
+                              ))}
+                              {mentorData.skills.length > 3 && (
+                                <Badge variant="outline" className="text-xs">
+                                  +{mentorData.skills.length - 3} more
+                                </Badge>
+                              )}
+                            </div>
+                          )}
+
+                          <div className="flex items-center space-x-2 pt-2">
+                            <Link to={`/mentor/${mentor.id}`} className="flex-1">
+                              <Button className="w-full btn-gradient">
+                                View Profile
+                              </Button>
+                            </Link>
+                            <Button 
+                              variant="outline" 
+                              size="icon"
+                              onClick={() => handleBookmark(mentor.id)}
+                            >
+                              <Heart 
+                                className={`h-4 w-4 ${
+                                  isBookmarked ? 'fill-red-500 text-red-500' : ''
+                                }`} 
+                              />
                             </Button>
-                          </Link>
-                          <Button variant="outline">
-                            <MessageCircle className="h-4 w-4 mr-2" />
-                            Message
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="icon"
-                            onClick={() => handleBookmark(mentor.id)}
-                          >
-                            <Heart 
-                              className={`h-4 w-4 ${
-                                mentor.isBookmarked ? 'fill-red-500 text-red-500' : ''
-                              }`} 
-                            />
-                          </Button>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             )}
           </div>
