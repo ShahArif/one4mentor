@@ -21,6 +21,7 @@ import VideoCall from "./pages/video/VideoCall";
 import SessionFeedback from "./pages/feedback/SessionFeedback";
 import ReviewsRatings from "./pages/reviews/ReviewsRatings";
 import AnalyticsDashboard from "./pages/analytics/AnalyticsDashboard";
+import AdminDashboard from "./pages/admin/AdminDashboard";
 
 const queryClient = new QueryClient();
 
@@ -48,6 +49,7 @@ const App = () => (
           <Route path="/session-feedback/:id" element={<SessionFeedback />} />
           <Route path="/reviews" element={<ReviewsRatings />} />
           <Route path="/analytics" element={<AnalyticsDashboard />} />
+          <Route path="/admin" element={<AdminDashboard />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
