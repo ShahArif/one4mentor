@@ -24,6 +24,7 @@ import AnalyticsDashboard from "./pages/analytics/AnalyticsDashboard";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminSetup from "./pages/admin/AdminSetup";
 import AdminLogin from "./pages/admin/AdminLogin";
+import RoleRedirect from "./pages/dashboard/RoleRedirect";
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -38,6 +39,7 @@ const App = () => (
           <Route path="/auth/register" element={<Register />} />
           <Route path="/onboarding/candidate" element={<CandidateOnboarding />} />
           <Route path="/onboarding/mentor" element={<MentorOnboarding />} />
+          <Route path="/dashboard" element={<RoleRedirect />} />
           <Route path="/candidate/dashboard" element={<CandidateDashboard />} />
           <Route path="/mentor/dashboard" element={<MentorDashboard />} />
           <Route path="/mentors" element={<MentorSearch />} />
