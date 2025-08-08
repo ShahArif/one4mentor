@@ -121,7 +121,7 @@ export default function ReviewsRatings() {
               <Card>
                 <CardContent className="p-6 text-center">
                   <div className="flex items-center justify-center mb-2">
-                    <Star className="h-8 w-8 text-yellow-400 fill-yellow-400" />
+                    <Star className="h-8 w-8 text-gold fill-gold" />
                   </div>
                   <p className="text-3xl font-bold">{overallStats.averageRating}</p>
                   <p className="text-sm text-muted-foreground">Average Rating</p>
@@ -170,7 +170,7 @@ export default function ReviewsRatings() {
                     <div key={item.stars} className="flex items-center space-x-4">
                       <div className="flex items-center space-x-1 w-16">
                         <span className="text-sm font-medium">{item.stars}</span>
-                        <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                        <Star className="h-4 w-4 fill-gold text-gold" />
                       </div>
                       <div className="flex-1">
                         <Progress value={item.percentage} className="h-2" />
@@ -214,7 +214,7 @@ export default function ReviewsRatings() {
                                       key={i}
                                       className={`h-4 w-4 ${
                                         i < review.rating
-                                          ? "fill-yellow-400 text-yellow-400"
+                                          ? "fill-gold text-gold"
                                           : "text-muted-foreground"
                                       }`}
                                     />
@@ -289,7 +289,7 @@ export default function ReviewsRatings() {
                                     key={i}
                                     className={`h-4 w-4 ${
                                       i < review.rating
-                                        ? "fill-yellow-400 text-yellow-400"
+                                        ? "fill-gold text-gold"
                                         : "text-muted-foreground"
                                     }`}
                                   />
@@ -334,7 +334,7 @@ export default function ReviewsRatings() {
                       <div className="flex items-center justify-between">
                         <h4 className="font-semibold">{skill.name}</h4>
                         <div className="flex items-center space-x-2">
-                          <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                          <Star className="h-4 w-4 fill-gold text-gold" />
                           <span className="font-medium">{skill.rating}</span>
                           <span className="text-sm text-muted-foreground">({skill.reviews} reviews)</span>
                         </div>
