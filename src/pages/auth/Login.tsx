@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { AuthLayout } from "@/components/auth/AuthLayout";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, Mail, Lock } from "lucide-react";
-
+import { supabase } from "@/integrations/supabase/client";
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -21,26 +21,103 @@ export default function Login() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  // Clean Supabase auth keys to avoid limbo states
+  const cleanupAuthState = () => {
+    try {
+      // Local storage
+      Object.keys(localStorage).forEach((key) => {
+        if (key.startsWith("supabase.auth.") || key.includes("sb-")) {
+          localStorage.removeItem(key);
+        }
+      });
+      // Session storage
+      Object.keys(sessionStorage).forEach((key) => {
+        if (key.startsWith("supabase.auth.") || key.includes("sb-")) {
+          sessionStorage.removeItem(key);
+        }
+      });
+    } catch {
+      // no-op
+    }
+  };
+
+  // Redirect user based on role
+  const redirectByRole = async (userId: string) => {
+    let target = "/candidate/dashboard";
+    try {
+      const { data: roles, error } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userId);
+
+      if (!error && roles && roles.length > 0) {
+        const roleValues = roles.map((r: any) => r.role);
+        if (roleValues.includes("mentor")) {
+          target = "/mentor/dashboard";
+        } else if (roleValues.includes("candidate")) {
+          target = "/candidate/dashboard";
+        }
+      }
+    } catch {
+      // fall back to default target
+    }
+    window.location.href = target;
+  };
+
+  // Handle OAuth return and already-authenticated users
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_IN" && session?.user) {
+        // Defer to avoid deadlocks
+        setTimeout(() => {
+          redirectByRole(session.user!.id);
+        }, 0);
+      }
+    });
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        redirectByRole(session.user.id);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Mock authentication - replace with real authentication
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      // Clean up any previous sessions
+      cleanupAuthState();
+      try {
+        await supabase.auth.signOut({ scope: "global" });
+      } catch {
+        // ignore
+      }
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password,
+      });
+
+      if (error || !data.user) {
+        throw error || new Error("Invalid credentials");
+      }
+
       toast({
         title: "Welcome back!",
-        description: "You have been successfully logged in.",
+        description: "Signed in successfully.",
       });
-      
-      // Redirect based on user role (mock logic)
-      navigate("/candidate/dashboard");
-    } catch (error) {
+
+      await redirectByRole(data.user.id);
+    } catch (error: any) {
       toast({
         title: "Login failed",
-        description: "Please check your credentials and try again.",
+        description: error?.message || "Please check your credentials and try again.",
         variant: "destructive",
       });
     } finally {
@@ -50,18 +127,29 @@ export default function Login() {
 
   const handleGoogleLogin = async () => {
     setIsLoading(true);
-    // Mock Google OAuth
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      toast({
-        title: "Google login successful!",
-        description: "You have been successfully logged in with Google.",
+      // Clean up any previous sessions
+      cleanupAuthState();
+      try {
+        await supabase.auth.signOut({ scope: "global" });
+      } catch {
+        // ignore
+      }
+
+      const redirectUrl = `${window.location.origin}/auth/login`;
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: redirectUrl,
+        },
       });
-      navigate("/candidate/dashboard");
-    } catch (error) {
+      if (error) throw error;
+
+      // After OAuth, Supabase redirects back; useEffect handles the final redirect
+    } catch (error: any) {
       toast({
         title: "Google login failed",
-        description: "Please try again.",
+        description: error?.message || "Please try again.",
         variant: "destructive",
       });
     } finally {
