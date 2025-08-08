@@ -8,7 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useLogout } from "@/hooks/use-logout";
-import { Loader2, ShieldCheck, Users, CheckCircle2, XCircle, LogOut, FileText } from "lucide-react";
+import { Loader2, ShieldCheck, Users, CheckCircle2, XCircle, LogOut, FileText, UserPlus, Edit, Trash2 } from "lucide-react";
+import { AddUserDialog } from "@/components/admin/AddUserDialog";
+import { EditUserDialog } from "@/components/admin/EditUserDialog";
+import { DeleteUserDialog } from "@/components/admin/DeleteUserDialog";
 
 type AppRole = "super_admin" | "admin" | "mentor" | "candidate";
 
@@ -47,6 +50,12 @@ export default function AdminDashboard() {
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const { logout } = useLogout();
+  
+  // Dialog states
+  const [addUserDialogOpen, setAddUserDialogOpen] = useState(false);
+  const [editUserDialogOpen, setEditUserDialogOpen] = useState(false);
+  const [deleteUserDialogOpen, setDeleteUserDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
 
   // Auth + role gate
   useEffect(() => {
@@ -257,6 +266,17 @@ export default function AdminDashboard() {
     }
   };
 
+  // User management actions
+  const handleEditUser = (user: Profile) => {
+    setSelectedUser(user);
+    setEditUserDialogOpen(true);
+  };
+
+  const handleDeleteUser = (user: Profile) => {
+    setSelectedUser(user);
+    setDeleteUserDialogOpen(true);
+  };
+
   if (checkingAuth) {
     return (
       <main className="container py-10">
@@ -306,8 +326,12 @@ export default function AdminDashboard() {
 
         <TabsContent value="users" className="mt-6">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle>User Management</CardTitle>
+              <Button onClick={() => setAddUserDialogOpen(true)} className="ml-auto">
+                <UserPlus className="h-4 w-4 mr-2" />
+                Add User
+              </Button>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -317,7 +341,8 @@ export default function AdminDashboard() {
                       <TableHead>Email</TableHead>
                       <TableHead>Name</TableHead>
                       <TableHead>Roles</TableHead>
-                      <TableHead className="w-[280px]">Actions</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead className="w-[400px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -334,18 +359,45 @@ export default function AdminDashboard() {
                               <Badge key={r} variant={roleColors[r]}>{r}</Badge>
                             ))}
                           </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {new Date(p.created_at).toLocaleDateString()}
+                          </TableCell>
                           <TableCell className="space-x-2">
-                            {available.map((r) => (
-                              roles.includes(r) ? (
-                                <Button key={r} size="sm" variant="outline" onClick={() => removeRole(p.id, r)}>
-                                  Remove {r}
+                            <div className="flex flex-wrap gap-2">
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                onClick={() => handleEditUser(p)}
+                                className="h-8"
+                              >
+                                <Edit className="h-3 w-3 mr-1" />
+                                Edit
+                              </Button>
+                              {p.id !== userId && (
+                                <Button 
+                                  size="sm" 
+                                  variant="outline" 
+                                  onClick={() => handleDeleteUser(p)}
+                                  className="h-8 text-destructive hover:text-destructive"
+                                >
+                                  <Trash2 className="h-3 w-3 mr-1" />
+                                  Delete
                                 </Button>
-                              ) : (
-                                <Button key={r} size="sm" onClick={() => assignRole(p.id, r)}>
-                                  Make {r}
-                                </Button>
-                              )
-                            ))}
+                              )}
+                              <div className="flex flex-wrap gap-1">
+                                {available.map((r) => (
+                                  roles.includes(r) ? (
+                                    <Button key={r} size="sm" variant="outline" onClick={() => removeRole(p.id, r)} className="h-8 text-xs">
+                                      Remove {r}
+                                    </Button>
+                                  ) : (
+                                    <Button key={r} size="sm" onClick={() => assignRole(p.id, r)} className="h-8 text-xs">
+                                      Make {r}
+                                    </Button>
+                                  )
+                                ))}
+                              </div>
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
@@ -514,6 +566,24 @@ export default function AdminDashboard() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* User Management Dialogs */}
+      <AddUserDialog 
+        open={addUserDialogOpen} 
+        onOpenChange={setAddUserDialogOpen} 
+      />
+      
+      <EditUserDialog 
+        open={editUserDialogOpen} 
+        onOpenChange={setEditUserDialogOpen}
+        user={selectedUser}
+      />
+      
+      <DeleteUserDialog 
+        open={deleteUserDialogOpen} 
+        onOpenChange={setDeleteUserDialogOpen}
+        user={selectedUser}
+      />
     </main>
   );
 }
