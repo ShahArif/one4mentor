@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useLogout } from "@/hooks/use-logout";
+import { ProtectedRoute } from "@/components/layout/ProtectedRoute";
+import { useAuth } from "@/hooks/use-auth";
 
 const upcomingSessions = [
   {
@@ -58,8 +60,11 @@ const learningProgress = [
   { skill: "Data Structures", progress: 75 }
 ];
 
-export default function CandidateDashboard() {
+function CandidateDashboardInner() {
   const { logout } = useLogout();
+  const { profile } = useAuth();
+  const displayName = profile?.display_name || profile?.email || "there";
+
   return (
     <div className="min-h-screen bg-gradient-hero">
       {/* Header */}
@@ -67,7 +72,7 @@ export default function CandidateDashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between py-6">
             <div>
-              <h1 className="text-3xl font-bold">Welcome back, Alex!</h1>
+              <h1 className="text-3xl font-bold">Welcome back, {displayName}!</h1>
               <p className="text-muted-foreground">Continue your learning journey</p>
             </div>
             <div className="flex items-center gap-3">
@@ -278,5 +283,13 @@ export default function CandidateDashboard() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function CandidateDashboard() {
+  return (
+    <ProtectedRoute requiredRoles={["candidate"]}>
+      <CandidateDashboardInner />
+    </ProtectedRoute>
   );
 }

@@ -175,7 +175,7 @@ const SessionManagement = () => {
                       <Star
                         key={star}
                         className={`w-4 h-4 ${
-                          star <= session.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'
+                          star <= session.rating ? 'fill-gold text-gold' : 'text-gray-300'
                         }`}
                       />
                     ))}

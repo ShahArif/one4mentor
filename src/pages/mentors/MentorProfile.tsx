@@ -39,6 +39,9 @@ interface MentorProfile {
     linkedinProfile?: string;
     experience?: string;
     introduction?: string;
+    rating?: string;
+    reviewCount?: string;
+    location?: string;
   };
 }
 
@@ -50,7 +53,6 @@ const MentorProfile = () => {
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  // Check authentication
   useEffect(() => {
     const checkAuth = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -64,47 +66,38 @@ const MentorProfile = () => {
         navigate("/auth/login");
         return;
       }
-
       setIsAuthenticated(true);
     };
-
     checkAuth();
   }, [navigate, toast]);
 
-  // Fetch mentor data
   const mentorQuery = useQuery({
     queryKey: ["mentor", id],
     queryFn: async (): Promise<MentorProfile | null> => {
       if (!id) return null;
 
-      // Get mentor profile
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", id)
         .single();
-
       if (profileError) throw profileError;
 
-      // Check if user has mentor role
       const { data: roleData, error: roleError } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", id)
         .eq("role", "mentor")
         .single();
-
       if (roleError && roleError.code !== 'PGRST116') throw roleError;
       if (!roleData) throw new Error("User is not a mentor");
 
-      // Get mentor onboarding data
       const { data: mentorData, error: mentorDataError } = await supabase
         .from("mentor_onboarding_requests")
         .select("data")
         .eq("user_id", id)
         .eq("status", "approved")
         .single();
-
       if (mentorDataError && mentorDataError.code !== 'PGRST116') {
         console.warn("Mentor data not found, using profile only");
       }
@@ -176,8 +169,6 @@ const MentorProfile = () => {
 
   const mentor = mentorQuery.data;
   const mentorData = mentor.mentor_data || {};
-
-  // Calculate pricing based on hourly rate
   const hourlyRate = parseInt(mentorData.hourlyRate || "0");
   const pricing = {
     "30min": Math.round(hourlyRate * 0.5),
@@ -188,20 +179,13 @@ const MentorProfile = () => {
   return (
     <div className="min-h-screen bg-gradient-hero">
       <main className="container mx-auto px-4 py-8">
-        {/* Back Button */}
-        <Button 
-          variant="ghost" 
-          onClick={() => navigate("/mentors")}
-          className="mb-6"
-        >
+        <Button variant="ghost" onClick={() => navigate("/mentors")} className="mb-6">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Search
         </Button>
 
         <div className="grid lg:grid-cols-3 gap-8">
-          {/* Mentor Info */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Header Card */}
             <Card>
               <CardContent className="pt-6">
                 <div className="flex items-start space-x-6">
@@ -215,7 +199,7 @@ const MentorProfile = () => {
                         .toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
-                  
+
                   <div className="flex-1">
                     <h1 className="text-3xl font-bold mb-2">
                       {mentorData.fullName || mentor.display_name || 'Anonymous Mentor'}
@@ -224,26 +208,31 @@ const MentorProfile = () => {
                       {mentorData.currentRole || 'Professional Mentor'}
                       {mentorData.company && ` at ${mentorData.company}`}
                     </p>
-                    
-                    <div className="flex items-center space-x-6 mb-4">
-                      <div className="flex items-center">
-                        <Star className="h-5 w-5 fill-primary text-primary mr-1" />
-                        <span className="font-semibold">4.8</span>
-                        <span className="text-muted-foreground ml-1">(42 reviews)</span>
+
+                    <div className="flex flex-wrap gap-4 mb-4">
+                      <div className="flex items-center gap-1">
+                        <Star className="w-4 h-4 fill-gold text-gold" />
+                        <span className="font-semibold">{mentorData.rating || "4.8"}</span>
+                        <span className="text-muted-foreground">
+                          ({mentorData.reviewCount || "42"} reviews)
+                        </span>
                       </div>
-                      
-                      <div className="flex items-center text-muted-foreground">
-                        <Clock className="h-4 w-4 mr-1" />
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <Clock className="w-4 h-4" />
                         <span>{mentorData.experience || '0'}+ years experience</span>
                       </div>
-                      
-                      <div className="flex items-center text-muted-foreground">
-                        <Users className="h-4 w-4 mr-1" />
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <Users className="w-4 h-4" />
                         <span>25+ mentees</span>
                       </div>
+                      {mentorData.location && (
+                        <div className="flex items-center gap-1 text-muted-foreground">
+                          <MapPin className="w-4 h-4" />
+                          <span>{mentorData.location}</span>
+                        </div>
+                      )}
                     </div>
 
-                    {/* Action Buttons */}
                     <div className="flex space-x-3">
                       <Button onClick={handleMessage} variant="outline">
                         <MessageCircle className="h-4 w-4 mr-2" />
@@ -265,14 +254,13 @@ const MentorProfile = () => {
               </CardContent>
             </Card>
 
-            {/* Details Tabs */}
             <Tabs defaultValue="about" className="w-full">
               <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="about">About</TabsTrigger>
                 <TabsTrigger value="skills">Skills</TabsTrigger>
                 <TabsTrigger value="availability">Availability</TabsTrigger>
               </TabsList>
-              
+
               <TabsContent value="about" className="space-y-4">
                 <Card>
                   <CardHeader>
@@ -308,7 +296,7 @@ const MentorProfile = () => {
                   </CardContent>
                 </Card>
               </TabsContent>
-              
+
               <TabsContent value="skills" className="space-y-4">
                 <Card>
                   <CardHeader>
@@ -331,7 +319,7 @@ const MentorProfile = () => {
                   </CardContent>
                 </Card>
               </TabsContent>
-              
+
               <TabsContent value="availability" className="space-y-4">
                 <Card>
                   <CardHeader>
@@ -358,7 +346,6 @@ const MentorProfile = () => {
             </Tabs>
           </div>
 
-          {/* Booking Card */}
           <div className="lg:col-span-1">
             <Card className="sticky top-8">
               <CardHeader>
@@ -368,7 +355,6 @@ const MentorProfile = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Duration Selection */}
                 <div>
                   <label className="text-sm font-medium mb-2 block">Duration</label>
                   <div className="space-y-2">
@@ -393,7 +379,6 @@ const MentorProfile = () => {
                   </div>
                 </div>
 
-                {/* Book Button */}
                 <Button 
                   className="w-full btn-gradient" 
                   size="lg"
@@ -403,7 +388,6 @@ const MentorProfile = () => {
                   Book {selectedDuration} Session
                 </Button>
 
-                {/* Quick Stats */}
                 <div className="pt-4 border-t space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Response time</span>

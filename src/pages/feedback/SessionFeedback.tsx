@@ -56,7 +56,7 @@ export default function SessionFeedback() {
 
   const getScoreColor = (score: number) => {
     if (score >= 85) return "text-green-600";
-    if (score >= 70) return "text-yellow-600";
+    if (score >= 70) return "text-warning";
     return "text-red-600";
   };
 
@@ -185,7 +185,7 @@ export default function SessionFeedback() {
                         <Star
                           className={`h-8 w-8 ${
                             star <= rating
-                              ? "fill-yellow-400 text-yellow-400"
+                              ? "fill-gold text-gold"
                               : "text-muted-foreground"
                           }`}
                         />

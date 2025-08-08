@@ -102,7 +102,7 @@ export default function AnalyticsDashboard() {
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center space-x-2">
-                    <Star className="h-5 w-5 text-yellow-400" />
+                    <Star className="h-5 w-5 text-gold" />
                     <div>
                       <p className="text-2xl font-bold">{performanceMetrics.averageRating}</p>
                       <p className="text-xs text-muted-foreground">Avg Rating</p>
@@ -217,7 +217,7 @@ export default function AnalyticsDashboard() {
                       </div>
                       <div className="text-right">
                         <div className="flex items-center space-x-1">
-                          <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                          <Star className="h-4 w-4 fill-gold text-gold" />
                           <span className="font-medium">{skill.satisfaction}</span>
                         </div>
                         <p className="text-sm text-muted-foreground">Satisfaction</p>
