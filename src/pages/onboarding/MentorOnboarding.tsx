@@ -9,6 +9,8 @@ import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { User, Briefcase, DollarSign, CheckCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 const skillOptions = [
   "JavaScript", "Python", "React", "Node.js", "Java", "Data Science",
@@ -21,7 +23,9 @@ const availabilityOptions = [
 
 export default function MentorOnboarding() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     fullName: "",
     bio: "",
@@ -67,10 +71,51 @@ export default function MentorOnboarding() {
     }
   };
 
-  const handleComplete = () => {
-    // Save onboarding data
-    console.log("Mentor onboarding completed:", formData);
-    navigate("/mentor/dashboard");
+  const handleComplete = async () => {
+    setIsSubmitting(true);
+    
+    try {
+      // Get the current user
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !user) {
+        toast({
+          title: "Authentication Error",
+          description: "Please log in to complete onboarding.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Save onboarding data to Supabase
+      const { error } = await supabase
+        .from("mentor_onboarding_requests")
+        .insert({
+          user_id: user.id,
+          data: formData,
+          status: "pending"
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      toast({
+        title: "Application Submitted",
+        description: "Your mentor application has been submitted for review. You'll be notified once it's approved.",
+      });
+
+      navigate("/dashboard");
+    } catch (error: any) {
+      console.error("Error submitting mentor application:", error);
+      toast({
+        title: "Submission Failed",
+        description: error.message || "Failed to submit application. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const renderStep = () => {
@@ -253,39 +298,46 @@ export default function MentorOnboarding() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-subtle flex items-center justify-center p-4">
-      <Card className="w-full max-w-2xl">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Mentor Onboarding</CardTitle>
-          <Progress value={progress} className="mt-4" />
-          <p className="text-sm text-muted-foreground">Step {currentStep} of 4</p>
-        </CardHeader>
-        
-        <CardContent>
-          {renderStep()}
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      <div className="container max-w-2xl py-10">
+        <Card className="shadow-xl border-0">
+          <CardHeader className="text-center pb-8">
+            <CardTitle className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              Mentor Onboarding
+            </CardTitle>
+            <Progress value={progress} className="mt-4" />
+            <p className="text-sm text-muted-foreground mt-2">Step {currentStep} of 4</p>
+          </CardHeader>
           
-          <div className="flex justify-between mt-8">
-            <Button
-              variant="outline"
-              onClick={handlePrevious}
-              disabled={currentStep === 1}
-            >
-              Previous
-            </Button>
+          <CardContent>
+            {renderStep()}
             
-            {currentStep === 4 ? (
-              <Button onClick={handleComplete} className="bg-gradient-primary">
-                <CheckCircle className="h-4 w-4 mr-2" />
-                Complete Setup
-              </Button>
-            ) : (
-              <Button onClick={handleNext} className="bg-gradient-primary">
-                Next
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+            <div className="flex justify-between mt-8">
+              {currentStep > 1 && (
+                <Button variant="outline" onClick={handlePrevious}>
+                  Previous
+                </Button>
+              )}
+              
+              <div className="ml-auto">
+                {currentStep < 4 ? (
+                  <Button onClick={handleNext} className="btn-gradient">
+                    Next
+                  </Button>
+                ) : (
+                  <Button 
+                    onClick={handleComplete} 
+                    className="btn-gradient"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? "Submitting..." : "Complete Application"}
+                  </Button>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
