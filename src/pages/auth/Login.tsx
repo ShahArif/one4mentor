@@ -36,7 +36,7 @@ export default function Login() {
       });
       
       // Redirect based on user role (mock logic)
-      navigate("/dashboard/candidate");
+      navigate("/candidate/dashboard");
     } catch (error) {
       toast({
         title: "Login failed",
@@ -57,7 +57,7 @@ export default function Login() {
         title: "Google login successful!",
         description: "You have been successfully logged in with Google.",
       });
-      navigate("/dashboard/candidate");
+      navigate("/candidate/dashboard");
     } catch (error) {
       toast({
         title: "Google login failed",
