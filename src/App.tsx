@@ -23,7 +23,7 @@ import ReviewsRatings from "./pages/reviews/ReviewsRatings";
 import AnalyticsDashboard from "./pages/analytics/AnalyticsDashboard";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminSetup from "./pages/admin/AdminSetup";
-
+import AdminLogin from "./pages/admin/AdminLogin";
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -50,7 +50,8 @@ const App = () => (
           <Route path="/session-feedback/:id" element={<SessionFeedback />} />
           <Route path="/reviews" element={<ReviewsRatings />} />
           <Route path="/analytics" element={<AnalyticsDashboard />} />
-          <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/admin" element={<AdminLogin />} />
+          <Route path="/admin/dashboard" element={<AdminDashboard />} />
           <Route path="/admin/setup" element={<AdminSetup />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
