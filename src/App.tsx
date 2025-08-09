@@ -7,8 +7,10 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
+import OAuthCallback from "./pages/auth/OAuthCallback";
 import CandidateOnboarding from "./pages/onboarding/CandidateOnboarding";
 import MentorOnboarding from "./pages/onboarding/MentorOnboarding";
+import PendingApproval from "./pages/onboarding/PendingApproval";
 import CandidateDashboard from "./pages/dashboard/CandidateDashboard";
 import MentorDashboard from "./pages/dashboard/MentorDashboard";
 import MentorSearch from "./pages/mentors/MentorSearch";
@@ -37,9 +39,10 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/auth/login" element={<Login />} />
           <Route path="/auth/register" element={<Register />} />
+          <Route path="/auth/callback" element={<OAuthCallback />} />
           <Route path="/onboarding/candidate" element={<CandidateOnboarding />} />
           <Route path="/onboarding/mentor" element={<MentorOnboarding />} />
-          <Route path="/dashboard" element={<RoleRedirect />} />
+          <Route path="/onboarding/pending-approval" element={<PendingApproval />} />
           <Route path="/candidate/dashboard" element={<CandidateDashboard />} />
           <Route path="/mentor/dashboard" element={<MentorDashboard />} />
           <Route path="/mentors" element={<MentorSearch />} />

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { User, Briefcase, DollarSign, CheckCircle } from "lucide-react";
+import { User, Briefcase, DollarSign, CheckCircle, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -26,6 +26,8 @@ export default function MentorOnboarding() {
   const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [formData, setFormData] = useState({
     fullName: "",
     bio: "",
@@ -40,6 +42,53 @@ export default function MentorOnboarding() {
   });
 
   const progress = (currentStep / 4) * 100;
+
+  // Check authentication on component mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        
+        if (error || !user) {
+          console.error("Authentication check failed:", error);
+          toast({
+            title: "Authentication Required",
+            description: "Please log in to access mentor onboarding.",
+            variant: "destructive",
+          });
+          navigate("/auth/login");
+          return;
+        }
+        
+        console.log("✅ User authenticated for onboarding:", user.email);
+        setIsAuthenticated(true);
+      } catch (error) {
+        console.error("Auth check error:", error);
+        navigate("/auth/login");
+      } finally {
+        setIsCheckingAuth(false);
+      }
+    };
+
+    checkAuth();
+  }, [navigate, toast]);
+
+  // Show loading state while checking authentication
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
+        <div className="flex items-center space-x-2">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span>Verifying authentication...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render the form if not authenticated
+  if (!isAuthenticated) {
+    return null;
+  }
 
   const handleSkillToggle = (skill: string) => {
     setFormData(prev => ({
@@ -75,42 +124,121 @@ export default function MentorOnboarding() {
     setIsSubmitting(true);
     
     try {
-      // Get the current user
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      console.log("🔍 Mentor onboarding: Starting submission...");
       
-      if (authError || !user) {
+      // Try to refresh session first
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !sessionData.session) {
+        console.warn("Session issue, attempting to refresh...");
+        
+        // Try to refresh the session
+        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+        
+        if (refreshError || !refreshData.session) {
+          console.error("Session refresh failed:", refreshError);
+          toast({
+            title: "Session Expired",
+            description: "Your session has expired. Please log in again.",
+            variant: "destructive",
+          });
+          navigate("/auth/login");
+          return;
+        }
+        
+        console.log("✅ Session refreshed successfully");
+      }
+      
+      // Enhanced authentication check with better debugging
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      
+      console.log("Auth data:", { authData, authError });
+      
+      if (authError) {
+        console.error("Authentication error details:", authError);
         toast({
           title: "Authentication Error",
-          description: "Please log in to complete onboarding.",
+          description: `Session error: ${authError.message}. Please try logging in again.`,
+          variant: "destructive",
+        });
+        // Redirect to login instead of just returning
+        navigate("/auth/login");
+        return;
+      }
+      
+      if (!authData?.user) {
+        console.error("No user found in auth data");
+        toast({
+          title: "Authentication Error", 
+          description: "No active session found. Please log in to complete onboarding.",
+          variant: "destructive",
+        });
+        navigate("/auth/login");
+        return;
+      }
+
+      const user = authData.user;
+      console.log("✅ User authenticated:", user.id, user.email);
+
+      // Validate form data before submission
+      const requiredFields = ['fullName', 'currentRole', 'experience'];
+      const missingFields = requiredFields.filter(field => !formData[field]);
+      
+      if (missingFields.length > 0) {
+        toast({
+          title: "Missing Information",
+          description: `Please fill in: ${missingFields.join(', ')}`,
           variant: "destructive",
         });
         return;
       }
 
-      // Save onboarding data to Supabase
-      const { error } = await supabase
+      console.log("📝 Submitting mentor application...", {
+        user_id: user.id,
+        formData: formData
+      });
+
+      // Save onboarding data to Supabase with "pending" status for admin approval
+      const { error: insertError } = await supabase
         .from("mentor_onboarding_requests")
         .insert({
           user_id: user.id,
           data: formData,
-          status: "pending"
+          status: "pending" // This will require admin approval
         });
 
-      if (error) {
-        throw error;
+      if (insertError) {
+        console.error("Insert error:", insertError);
+        throw insertError;
       }
 
+      console.log("✅ Mentor application submitted successfully");
+
       toast({
-        title: "Application Submitted",
-        description: "Your mentor application has been submitted for review. You'll be notified once it's approved.",
+        title: "Application Submitted Successfully! 🎉",
+        description: "Your mentor application has been submitted for review by our admin team. You'll receive a notification once it's approved.",
       });
 
-      navigate("/dashboard");
+      // Redirect to a pending approval page instead of dashboard
+      navigate("/onboarding/pending-approval");
     } catch (error: any) {
       console.error("Error submitting mentor application:", error);
+      
+      let errorMessage = "Failed to submit application. Please try again.";
+      
+      if (error.message?.includes("JWT") || error.message?.includes("session")) {
+        errorMessage = "Session expired. Please log in again and try submitting.";
+        // Auto-redirect to login for JWT errors
+        setTimeout(() => navigate("/auth/login"), 2000);
+      } else if (error.message?.includes("permission") || error.message?.includes("denied")) {
+        errorMessage = "Permission denied. Please ensure you're properly logged in.";
+      } else if (error.message?.includes("network") || error.message?.includes("fetch")) {
+        errorMessage = "Network error. Please check your connection and try again.";
+      }
+      
       toast({
         title: "Submission Failed",
-        description: error.message || "Failed to submit application. Please try again.",
+        description: error.message || errorMessage,
         variant: "destructive",
       });
     } finally {

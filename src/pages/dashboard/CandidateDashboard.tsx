@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -12,12 +14,14 @@ import {
   TrendingUp,
   Users,
   Bell,
-  LogOut
+  LogOut,
+  AlertCircle,
+  CheckCircle,
+  User
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useLogout } from "@/hooks/use-logout";
-import { ProtectedRoute } from "@/components/layout/ProtectedRoute";
-import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
 
 const upcomingSessions = [
   {
@@ -60,10 +64,154 @@ const learningProgress = [
   { skill: "Data Structures", progress: 75 }
 ];
 
-function CandidateDashboardInner() {
+export default function CandidateDashboard() {
   const { logout } = useLogout();
-  const { profile } = useAuth();
-  const displayName = profile?.display_name || profile?.email || "there";
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [approvalStatus, setApprovalStatus] = useState<{
+    isApproved: boolean;
+    isLoading: boolean;
+    applicationStatus?: string;
+    needsProfileCompletion?: boolean;
+  }>({ isApproved: false, isLoading: true });
+
+  useEffect(() => {
+    const checkApprovalStatus = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+
+        if (!user) {
+          navigate("/auth/login");
+          return;
+        }
+
+        // Check if user has candidate role
+        const { data: roles } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", user.id);
+
+        const userRoles = roles?.map(r => r.role) || [];
+
+        if (userRoles.includes("candidate")) {
+          // Check if profile is complete
+          const { data: candidateRequest } = await supabase
+            .from("candidate_onboarding_requests")
+            .select("data")
+            .eq("user_id", user.id)
+            .eq("status", "approved")
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .single();
+
+          const needsCompletion = !candidateRequest?.data?.bio || 
+                                 candidateRequest.data.bio === "New candidate - profile incomplete" ||
+                                 !candidateRequest?.data?.skills?.length ||
+                                 !candidateRequest?.data?.experience ||
+                                 candidateRequest.data.experience === "Entry Level";
+
+          setApprovalStatus({ 
+            isApproved: true, 
+            isLoading: false,
+            needsProfileCompletion: needsCompletion
+          });
+        } else {
+          // Handle users without candidate role
+          const { data: candidateRequest } = await supabase
+            .from("candidate_onboarding_requests")
+            .select("status")
+            .eq("user_id", user.id)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .single();
+
+          if (candidateRequest) {
+            setApprovalStatus({
+              isApproved: false,
+              isLoading: false,
+              applicationStatus: candidateRequest.status
+            });
+          } else {
+            // No role and no application - this should rarely happen with new registration flow
+            setApprovalStatus({ 
+              isApproved: true, 
+              isLoading: false,
+              needsProfileCompletion: true
+            });
+          }
+        }
+
+      } catch (error) {
+        console.error("Error checking approval status:", error);
+        setApprovalStatus({ isApproved: false, isLoading: false });
+      }
+    };
+
+    checkApprovalStatus();
+  }, [navigate, toast]);
+
+  if (approvalStatus.isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="flex items-center space-x-2">
+          <Clock className="h-4 w-4 animate-spin" />
+          <span>Loading dashboard...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // If not approved, show pending approval status
+  if (!approvalStatus.isApproved) {
+    return (
+      <div className="min-h-screen bg-gradient-hero">
+        <div className="container max-w-2xl py-16">
+          <Card className="shadow-xl">
+            <CardHeader className="text-center pb-6">
+              {approvalStatus.applicationStatus === "pending" ? (
+                <Clock className="h-16 w-16 mx-auto mb-4 text-blue-500" />
+              ) : approvalStatus.applicationStatus === "rejected" ? (
+                <AlertCircle className="h-16 w-16 mx-auto mb-4 text-red-500" />
+              ) : (
+                <AlertCircle className="h-16 w-16 mx-auto mb-4 text-yellow-500" />
+              )}
+              
+              <CardTitle className="text-2xl mb-2">
+                {approvalStatus.applicationStatus === "pending" ? "Application Under Review" :
+                 approvalStatus.applicationStatus === "rejected" ? "Application Not Approved" :
+                 "Complete Your Application"}
+              </CardTitle>
+            </CardHeader>
+            
+            <CardContent className="text-center space-y-4">
+              <p className="text-muted-foreground">
+                {approvalStatus.applicationStatus === "pending" 
+                  ? "Your candidate application is being reviewed by our admin team. You'll receive a notification once it's approved."
+                  : approvalStatus.applicationStatus === "rejected"
+                  ? "Your application was not approved. Please contact support for more information."
+                  : "Please complete your candidate onboarding to access the dashboard."}
+              </p>
+              
+              <div className="flex gap-3 justify-center">
+                {approvalStatus.applicationStatus === "pending" ? (
+                  <Button onClick={() => navigate("/onboarding/pending-approval")}>
+                    Check Status
+                  </Button>
+                ) : (
+                  <Button onClick={() => navigate("/onboarding/candidate")}>
+                    Complete Onboarding
+                  </Button>
+                )}
+                <Button variant="outline" onClick={() => navigate("/")}>
+                  Go Home
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-hero">
@@ -72,28 +220,46 @@ function CandidateDashboardInner() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between py-6">
             <div>
-              <h1 className="text-3xl font-bold">Welcome back, {displayName}!</h1>
-              <p className="text-muted-foreground">Continue your learning journey</p>
+              <h1 className="text-2xl font-bold text-gray-900">Candidate Dashboard</h1>
+              <p className="text-gray-600">Manage your mentorship journey</p>
             </div>
-            <div className="flex items-center gap-3">
-              <Button asChild className="btn-gradient">
-                <Link to="/mentors">
-                  <Users className="h-4 w-4 mr-2" />
-                  Find Mentors
-                </Link>
-              </Button>
-              <Button className="bg-gradient-primary">
-                <Bell className="h-4 w-4 mr-2" />
-                3 New
-              </Button>
-              <Button variant="outline" onClick={logout}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Sign out
-              </Button>
-            </div>
+            <Button 
+              variant="outline" 
+              onClick={logout}
+              className="flex items-center gap-2"
+            >
+              <LogOut className="h-4 w-4" />
+              Sign Out
+            </Button>
           </div>
         </div>
       </div>
+
+      {/* Profile Completion Banner */}
+      {approvalStatus.needsProfileCompletion && (
+        <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mx-4 mt-4 rounded-r-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <User className="h-5 w-5 text-blue-400 mr-3" />
+              <div>
+                <h3 className="text-sm font-medium text-blue-800">
+                  Complete Your Profile
+                </h3>
+                <p className="text-sm text-blue-700 mt-1">
+                  Add your skills, experience, and goals to get better mentor matches.
+                </p>
+              </div>
+            </div>
+            <Button 
+              size="sm" 
+              onClick={() => navigate("/onboarding/candidate")}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              Complete Profile
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Hero CTA for Finding Mentors */}
       <div className="bg-gradient-primary text-white">
@@ -121,7 +287,7 @@ function CandidateDashboardInner() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
         {/* Quick Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <Card>
@@ -283,13 +449,5 @@ function CandidateDashboardInner() {
         </div>
       </div>
     </div>
-  );
-}
-
-export default function CandidateDashboard() {
-  return (
-    <ProtectedRoute requiredRoles={["candidate"]}>
-      <CandidateDashboardInner />
-    </ProtectedRoute>
   );
 }

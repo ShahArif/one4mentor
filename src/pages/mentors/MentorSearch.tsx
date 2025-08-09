@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { setupTestMentors, checkDatabaseState } from "@/utils/setupTestMentors";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,7 +20,9 @@ import {
   Briefcase,
   ArrowLeft,
   Users,
-  Loader2
+  Loader2,
+  Database,
+  UserPlus
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -67,16 +70,14 @@ export default function MentorSearch() {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
-        toast({
-          title: "Authentication Required",
-          description: "Please log in to search for mentors.",
-          variant: "destructive",
-        });
-        navigate("/auth/login");
+        // Allow unauthenticated users to browse mentors
+        console.log("Unauthenticated user - allowing mentor browsing");
+        setIsAuthenticated(true);
+        setUserRole(null);
         return;
       }
 
-      // Check if user has candidate role
+      // Check if user has candidate role or admin role
       const { data: roles } = await supabase
         .from("user_roles")
         .select("role")
@@ -85,17 +86,40 @@ export default function MentorSearch() {
       const userRoles = roles?.map(r => r.role) || [];
       setUserRole(userRoles[0] || null);
       
-      if (!userRoles.includes("candidate") && !userRoles.includes("admin") && !userRoles.includes("super_admin")) {
-        toast({
-          title: "Access Restricted",
-          description: "This feature is available for candidates. Please complete your candidate onboarding.",
-          variant: "destructive",
-        });
-        navigate("/onboarding/candidate");
-        return;
-      }
-
+      console.log("User roles:", userRoles); // Debug log
+      
+      // Allow all authenticated users to browse mentors
+      // But restrict booking features to approved candidates
       setIsAuthenticated(true);
+      
+      // Optional: Show a message for users without candidate role
+      if (userRoles.length === 0) {
+        // Check if user has a pending application
+        const { data: candidateRequest } = await supabase
+          .from("candidate_onboarding_requests")
+          .select("status")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single();
+
+        if (candidateRequest?.status === "pending") {
+          toast({
+            title: "Application Under Review",
+            description: "You can browse mentors, but booking features will be available once your application is approved.",
+          });
+        } else if (candidateRequest?.status === "rejected") {
+          toast({
+            title: "Limited Access",
+            description: "You can browse mentors, but need approval to book sessions.",
+          });
+        } else if (!candidateRequest) {
+          toast({
+            title: "Browse Mentors",
+            description: "Complete your candidate application to unlock booking features.",
+          });
+        }
+      }
     };
 
     checkAuth();
@@ -105,25 +129,33 @@ export default function MentorSearch() {
   const mentorsQuery = useQuery({
     queryKey: ["mentors"],
     queryFn: async (): Promise<MentorProfile[]> => {
+      console.log("Fetching mentors..."); // Debug log
+      
       // First get all users with mentor role
       const { data: mentorRoles, error: rolesError } = await supabase
         .from("user_roles")
         .select("user_id")
         .eq("role", "mentor");
 
+      console.log("Mentor roles data:", mentorRoles, "Error:", rolesError); // Debug log
+
       if (rolesError) throw rolesError;
 
       if (!mentorRoles || mentorRoles.length === 0) {
+        console.log("No mentors found in user_roles table"); // Debug log
         return [];
       }
 
       const mentorIds = mentorRoles.map(r => r.user_id);
+      console.log("Mentor IDs:", mentorIds); // Debug log
 
       // Get profiles for these mentors
       const { data: profiles, error: profilesError } = await supabase
         .from("profiles")
         .select("*")
         .in("id", mentorIds);
+
+      console.log("Profiles data:", profiles, "Error:", profilesError); // Debug log
 
       if (profilesError) throw profilesError;
 
@@ -134,15 +166,21 @@ export default function MentorSearch() {
         .eq("status", "approved")
         .in("user_id", mentorIds);
 
+      console.log("Mentor onboarding data:", mentorData, "Error:", mentorDataError); // Debug log
+
       if (mentorDataError) throw mentorDataError;
 
       // Combine profile and mentor data
       const mentorDataMap = new Map(mentorData?.map(m => [m.user_id, m.data]) || []);
 
-      return profiles?.map(profile => ({
+      const result = profiles?.map(profile => ({
         ...profile,
         mentor_data: mentorDataMap.get(profile.id) || {}
       })) || [];
+
+      console.log("Final mentor result:", result); // Debug log
+      
+      return result;
     },
     enabled: isAuthenticated,
   });
@@ -232,6 +270,28 @@ export default function MentorSearch() {
               </p>
             </div>
           </div>
+
+          {/* INFO SECTION */}
+          <Card className="mb-6 border-blue-200 bg-blue-50">
+            <CardHeader>
+              <CardTitle className="text-blue-800 flex items-center">
+                <Database className="h-4 w-4 mr-2" />
+                Browse Mentors
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-blue-800 text-sm">
+                🌟 <strong>Open Access:</strong> Anyone can browse and view mentor profiles. 
+                Log in and complete candidate onboarding to unlock booking features.
+              </p>
+              <div className="mt-3 text-xs text-blue-600">
+                {userRole 
+                  ? `Welcome! You have ${userRole} access with full platform features.`
+                  : "Sign up or log in to book sessions and contact mentors directly."
+                }
+              </div>
+            </CardContent>
+          </Card>
           
           {/* Search and Filter Bar */}
           <div className="flex flex-col sm:flex-row gap-4">
@@ -316,6 +376,27 @@ export default function MentorSearch() {
         {/* Results */}
         <div className="grid lg:grid-cols-4 gap-6">
           <div className="lg:col-span-4">
+            {/* Debug Data Display */}
+            {process.env.NODE_ENV === 'development' && (
+              <Card className="mb-6 border-blue-200 bg-blue-50">
+                <CardHeader>
+                  <CardTitle className="text-blue-800 text-sm">Debug Info</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xs space-y-2">
+                    <p><strong>Authenticated:</strong> {isAuthenticated ? '✅ Yes' : '❌ No'}</p>
+                    <p><strong>User Role:</strong> {userRole || 'None'}</p>
+                    <p><strong>Query Status:</strong> {mentorsQuery.isLoading ? 'Loading...' : mentorsQuery.error ? 'Error' : 'Success'}</p>
+                    <p><strong>Raw Data Count:</strong> {mentorsQuery.data?.length || 0}</p>
+                    <p><strong>Filtered Count:</strong> {filteredMentors.length}</p>
+                    {mentorsQuery.error && (
+                      <p className="text-red-600"><strong>Error:</strong> {mentorsQuery.error.message}</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {mentorsQuery.isLoading ? (
               <div className="flex items-center justify-center py-12">
                 <div className="flex items-center space-x-2">
@@ -328,11 +409,22 @@ export default function MentorSearch() {
                 <CardContent className="py-12 text-center">
                   <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                   <h3 className="text-lg font-medium mb-2">No mentors found</h3>
-                  <p className="text-muted-foreground">
+                  <p className="text-muted-foreground mb-4">
                     {mentorsQuery.data?.length === 0 
-                      ? "No approved mentors are available yet. Check back later!"
+                      ? "No approved mentors are available yet. Mentors must complete their onboarding and be approved by our admin team before appearing in search results."
                       : "Try adjusting your search criteria or filters."}
                   </p>
+                  {mentorsQuery.data?.length === 0 && (
+                    <div className="text-center">
+                      <p className="text-sm text-muted-foreground mb-4">
+                        🔍 Looking to become a mentor? <br />
+                        Complete the mentor onboarding process and wait for admin approval.
+                      </p>
+                      <Button variant="outline" asChild>
+                        <Link to="/onboarding/mentor">Apply as Mentor</Link>
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ) : (
@@ -401,17 +493,33 @@ export default function MentorSearch() {
                                 View Profile
                               </Button>
                             </Link>
-                            <Button 
-                              variant="outline" 
-                              size="icon"
-                              onClick={() => handleBookmark(mentor.id)}
-                            >
-                              <Heart 
-                                className={`h-4 w-4 ${
-                                  isBookmarked ? 'fill-red-500 text-red-500' : ''
-                                }`} 
-                              />
-                            </Button>
+                            
+                            {/* Show bookmark button only for authenticated users */}
+                            {userRole && (
+                              <Button 
+                                variant="outline" 
+                                size="icon"
+                                onClick={() => handleBookmark(mentor.id)}
+                                title={isBookmarked ? "Remove from bookmarks" : "Add to bookmarks"}
+                              >
+                                <Heart 
+                                  className={`h-4 w-4 ${
+                                    isBookmarked ? 'fill-red-500 text-red-500' : ''
+                                  }`} 
+                                />
+                              </Button>
+                            )}
+                            
+                            {/* Show login prompt for unauthenticated users */}
+                            {!userRole && (
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => navigate("/auth/login")}
+                              >
+                                Login to Book
+                              </Button>
+                            )}
                           </div>
                         </div>
                       </CardContent>

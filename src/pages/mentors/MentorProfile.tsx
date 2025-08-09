@@ -58,12 +58,9 @@ const MentorProfile = () => {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
-        toast({
-          title: "Authentication Required",
-          description: "Please log in to view mentor profiles.",
-          variant: "destructive",
-        });
-        navigate("/auth/login");
+        // Allow unauthenticated users to view mentor profiles
+        console.log("Unauthenticated user viewing mentor profile");
+        setIsAuthenticated(true);
         return;
       }
       setIsAuthenticated(true);
@@ -112,17 +109,54 @@ const MentorProfile = () => {
 
   const handleBookSession = () => {
     if (!id) return;
-    navigate(`/booking/${id}?duration=${selectedDuration}`);
+    
+    // Check if user is authenticated first
+    const checkAuthAndBook = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({
+          title: "Login Required",
+          description: "Please log in to book a session with this mentor.",
+          variant: "destructive",
+        });
+        navigate("/auth/login");
+        return;
+      }
+      navigate(`/booking/${id}?duration=${selectedDuration}`);
+    };
+    
+    checkAuthAndBook();
   };
 
-  const handleBookmark = () => {
+  const handleBookmark = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast({
+        title: "Login Required",
+        description: "Please log in to bookmark mentors.",
+        variant: "destructive",
+      });
+      navigate("/auth/login");
+      return;
+    }
+    
     setIsBookmarked(!isBookmarked);
     toast({ 
       title: isBookmarked ? "Removed from bookmarks" : "Added to bookmarks" 
     });
   };
 
-  const handleMessage = () => {
+  const handleMessage = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast({
+        title: "Login Required", 
+        description: "Please log in to message mentors.",
+        variant: "destructive",
+      });
+      navigate("/auth/login");
+      return;
+    }
     navigate(`/chat?mentor=${id}`);
   };
 

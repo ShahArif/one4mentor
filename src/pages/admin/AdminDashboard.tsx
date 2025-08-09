@@ -252,17 +252,69 @@ export default function AdminDashboard() {
     id: string,
     decision: "approved" | "rejected"
   ) => {
-    const table = type === "mentor" ? "mentor_onboarding_requests" : "candidate_onboarding_requests";
-    const { error } = await supabase
-      .from(table)
-      .update({ status: decision })
-      .eq("id", id);
-    if (error) {
-      toast({ title: "Action failed", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: `Request ${decision}` });
+    try {
+      const table = type === "mentor" ? "mentor_onboarding_requests" : "candidate_onboarding_requests";
+      
+      // First, get the request details to get the user_id
+      const { data: requestData, error: fetchError } = await supabase
+        .from(table)
+        .select("user_id")
+        .eq("id", id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Update the request status
+      const { error: updateError } = await supabase
+        .from(table)
+        .update({ status: decision })
+        .eq("id", id);
+
+      if (updateError) throw updateError;
+
+      // If approved, assign the appropriate role to the user
+      if (decision === "approved" && requestData) {
+        const role = type === "mentor" ? "mentor" : "candidate";
+        
+        const { error: roleError } = await supabase
+          .from("user_roles")
+          .upsert({ 
+            user_id: requestData.user_id, 
+            role: role 
+          });
+
+        if (roleError) {
+          console.error("Error assigning role:", roleError);
+          // Still show success message but log the role assignment error
+          toast({ 
+            title: `Request ${decision}`, 
+            description: `Application ${decision} but there was an issue assigning the role. Please check manually.`,
+            variant: "destructive"
+          });
+        } else {
+          toast({ 
+            title: `✅ Request ${decision}!`, 
+            description: `The ${type} application has been ${decision} and the user role has been assigned.`
+          });
+        }
+      } else {
+        toast({ 
+          title: `Request ${decision}`, 
+          description: `The ${type} application has been ${decision}.`
+        });
+      }
+
+      // Refresh the queries
       queryClient.invalidateQueries({ queryKey: [type === "mentor" ? "mentor_requests" : "candidate_requests", "pending"] });
       queryClient.invalidateQueries({ queryKey: ["all_onboarding_requests"] });
+      
+    } catch (error: any) {
+      console.error("Error processing request:", error);
+      toast({ 
+        title: "Action failed", 
+        description: error.message || "Failed to process the request. Please try again.", 
+        variant: "destructive" 
+      });
     }
   };
 
