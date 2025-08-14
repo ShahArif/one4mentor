@@ -236,91 +236,46 @@ export default function CandidateOnboarding() {
         created_at: user.created_at
       });
 
-      // Check if user already has a candidate record (from registration)
-      console.log("🔍 Checking for existing candidate request...");
+      // Check if there's an existing candidate request
       const { data: existingRequest, error: checkError } = await supabase
         .from("candidate_onboarding_requests")
-        .select("id, status, data, created_at")
+        .select("id, status")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(1)
         .single();
 
-      console.log("Existing request check result:", { existingRequest, checkError });
-
-      if (checkError && checkError.code !== 'PGRST116') {
-        console.error("Error checking existing request:", checkError);
+      if (checkError && checkError.code !== "PGRST116") {
+        console.error("Check error:", checkError);
         throw checkError;
       }
 
       if (existingRequest) {
-        // Update existing candidate record
+        // Update existing record with complete profile data
         console.log("📝 Updating existing candidate profile...");
-        console.log("Existing request details:", {
-          id: existingRequest.id,
-          status: existingRequest.status,
-          created_at: existingRequest.created_at
-        });
-
-        // Check current user roles for debugging
-        const { data: userRoles, error: rolesError } = await supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", user.id);
-        
-        console.log("Current user roles:", { userRoles, rolesError });
-
         const { error: updateError } = await supabase
           .from("candidate_onboarding_requests")
           .update({
             data: submissionData,
-            status: "approved" // Keep or set as approved
+            status: "approved" // Changed from "complete" to "approved" - valid enum value
           })
           .eq("id", existingRequest.id);
 
-        console.log("Update attempt result:", { updateError });
-
         if (updateError) {
-          console.error("Update error details:", {
-            message: updateError.message,
-            details: updateError.details,
-            hint: updateError.hint,
-            code: updateError.code
-          });
-          
-          // If update fails due to RLS, try to create a new approved record
-          if (updateError.code === '42501' || updateError.message?.includes('permission')) {
-            console.log("🔄 Update failed due to permissions, creating new approved record...");
-            
-            const { error: insertError } = await supabase
-              .from("candidate_onboarding_requests")
-              .insert({
-                user_id: user.id,
-                data: submissionData,
-                status: "approved"
-              });
-
-            if (insertError) {
-              console.error("Insert error:", insertError);
-              throw insertError;
-            }
-            
-            console.log("✅ New approved candidate record created successfully");
-          } else {
-            throw updateError;
-          }
-        } else {
-          console.log("✅ Candidate profile updated successfully");
+          console.error("Update error:", updateError);
+          throw updateError;
         }
+        
+        console.log("✅ Candidate profile updated successfully");
       } else {
-        // Create new approved candidate record (fallback)
+        // Create new complete candidate record (fallback)
         console.log("📝 Creating new candidate profile...");
         const { error: insertError } = await supabase
           .from("candidate_onboarding_requests")
           .insert({
             user_id: user.id,
             data: submissionData,
-            status: "approved" // Create as approved since this is profile completion
+            status: "approved" // Changed from "complete" to "approved" - valid enum value
           });
 
         console.log("Insert attempt result:", { insertError });

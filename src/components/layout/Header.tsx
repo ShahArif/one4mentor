@@ -85,7 +85,7 @@ export function Header() {
 
               {/* Dashboard Link */}
               <Button variant="ghost" asChild>
-                <Link to={`/dashboard/${userRole}`} className="hidden md:flex">
+                <Link to={userRole === "mentor" ? "/mentor/dashboard" : "/candidate/dashboard"} className="hidden md:flex">
                   Dashboard
                 </Link>
               </Button>

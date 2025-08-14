@@ -3,6 +3,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/auth/Login";
@@ -27,42 +29,105 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminSetup from "./pages/admin/AdminSetup";
 import AdminLogin from "./pages/admin/AdminLogin";
 import RoleRedirect from "./pages/dashboard/RoleRedirect";
+
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/auth/login" element={<Login />} />
-          <Route path="/auth/register" element={<Register />} />
-          <Route path="/auth/callback" element={<OAuthCallback />} />
-          <Route path="/onboarding/candidate" element={<CandidateOnboarding />} />
-          <Route path="/onboarding/mentor" element={<MentorOnboarding />} />
-          <Route path="/onboarding/pending-approval" element={<PendingApproval />} />
-          <Route path="/candidate/dashboard" element={<CandidateDashboard />} />
-          <Route path="/mentor/dashboard" element={<MentorDashboard />} />
-          <Route path="/mentors" element={<MentorSearch />} />
-          <Route path="/mentor/:id" element={<MentorProfile />} />
-          <Route path="/booking/:id" element={<SessionBooking />} />
-          <Route path="/booking-confirmation/:id" element={<BookingConfirmation />} />
-          <Route path="/sessions" element={<SessionManagement />} />
-          <Route path="/chat" element={<ChatInterface />} />
-          <Route path="/video-call" element={<VideoCall />} />
-          <Route path="/session-feedback/:id" element={<SessionFeedback />} />
-          <Route path="/reviews" element={<ReviewsRatings />} />
-          <Route path="/analytics" element={<AnalyticsDashboard />} />
-          <Route path="/admin" element={<AdminLogin />} />
-          <Route path="/admin/dashboard" element={<AdminDashboard />} />
-          <Route path="/admin/setup" element={<AdminSetup />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
+    <AuthProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            {/* Public routes */}
+            <Route path="/" element={<Index />} />
+            <Route path="/auth/login" element={<Login />} />
+            <Route path="/auth/register" element={<Register />} />
+            <Route path="/auth/callback" element={<OAuthCallback />} />
+            <Route path="/mentors" element={<MentorSearch />} />
+            <Route path="/mentor/:id" element={<MentorProfile />} />
+            
+            {/* Protected routes */}
+            <Route path="/onboarding/candidate" element={
+              <ProtectedRoute>
+                <CandidateOnboarding />
+              </ProtectedRoute>
+            } />
+            <Route path="/onboarding/mentor" element={
+              <ProtectedRoute>
+                <MentorOnboarding />
+              </ProtectedRoute>
+            } />
+            <Route path="/onboarding/pending-approval" element={
+              <ProtectedRoute>
+                <PendingApproval />
+              </ProtectedRoute>
+            } />
+            <Route path="/candidate/dashboard" element={
+              <ProtectedRoute requiredRole="candidate">
+                <CandidateDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/mentor/dashboard" element={
+              <ProtectedRoute requiredRole="mentor">
+                <MentorDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/booking/:id" element={
+              <ProtectedRoute>
+                <SessionBooking />
+              </ProtectedRoute>
+            } />
+            <Route path="/booking-confirmation/:id" element={
+              <ProtectedRoute>
+                <BookingConfirmation />
+              </ProtectedRoute>
+            } />
+            <Route path="/sessions" element={
+              <ProtectedRoute>
+                <SessionManagement />
+              </ProtectedRoute>
+            } />
+            <Route path="/chat" element={
+              <ProtectedRoute>
+                <ChatInterface />
+              </ProtectedRoute>
+            } />
+            <Route path="/video-call" element={
+              <ProtectedRoute>
+                <VideoCall />
+              </ProtectedRoute>
+            } />
+            <Route path="/session-feedback/:id" element={
+              <ProtectedRoute>
+                <SessionFeedback />
+              </ProtectedRoute>
+            } />
+            <Route path="/reviews" element={
+              <ProtectedRoute>
+                <ReviewsRatings />
+              </ProtectedRoute>
+            } />
+            <Route path="/analytics" element={
+              <ProtectedRoute>
+                <AnalyticsDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin" element={<AdminLogin />} />
+            <Route path="/admin/dashboard" element={
+              <ProtectedRoute requiredRole="super_admin">
+                <AdminDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/setup" element={<AdminSetup />} />
+            
+            {/* Catch-all route */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </AuthProvider>
   </QueryClientProvider>
 );
 

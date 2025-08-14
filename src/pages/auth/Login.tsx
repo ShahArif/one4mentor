@@ -7,15 +7,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { AuthLayout } from "@/components/auth/AuthLayout";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, EyeOff, Mail, Lock, Bug } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { debugUserLogin, testPasswordReset, createUserIfNotExists } from "@/utils/debugUser";
-import { createCandidateUser, checkUserComplete } from "@/utils/adminActions";
-import { debugLogin, testSpecificUser, resetAndCreateCandidate } from "@/utils/debugAuth";
+
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [showDebug, setShowDebug] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -25,239 +22,52 @@ export default function Login() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Debug functions
-  const handleDebugUser = async () => {
-    if (!formData.email) {
-      toast({
-        title: "Enter email first",
-        description: "Please enter an email address to debug",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    const result = await debugUserLogin(formData.email);
-    
-    if (result.found) {
-      toast({
-        title: "User Found",
-        description: "Check console for detailed user information",
-      });
-    } else {
-      toast({
-        title: "User Not Found",
-        description: "This user doesn't exist in the database",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handlePasswordReset = async () => {
-    if (!formData.email) {
-      toast({
-        title: "Enter email first",
-        description: "Please enter an email address",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    const result = await testPasswordReset(formData.email);
-    
-    if (result.success) {
-      toast({
-        title: "Password Reset Sent",
-        description: "Check your email for password reset instructions",
-      });
-    } else {
-      toast({
-        title: "Password Reset Failed",
-        description: result.error?.message || "Failed to send reset email",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleCreateUser = async () => {
-    if (!formData.email) {
-      toast({
-        title: "Enter email first",
-        description: "Please enter an email address",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    const result = await createUserIfNotExists(formData.email);
-    
-    if (result.success) {
-      toast({
-        title: "User Created",
-        description: `User created with password: ${result.password}`,
-      });
-    } else {
-      toast({
-        title: "Failed to Create User",
-        description: result.error?.message || "Unknown error",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleCreateCandidate = async () => {
-    if (!formData.email) {
-      toast({
-        title: "Enter email first",
-        description: "Please enter an email address",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    const result = await createCandidateUser(formData.email);
-    
-    if (result.success) {
-      toast({
-        title: "Candidate Created",
-        description: result.message,
-      });
-    } else {
-      toast({
-        title: "Failed to Create Candidate",
-        description: result.error?.message || "Unknown error",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleCheckComplete = async () => {
-    if (!formData.email) {
-      toast({
-        title: "Enter email first",
-        description: "Please enter an email address",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    const result = await checkUserComplete(formData.email);
-    
-    if (result.exists) {
-      toast({
-        title: "User Analysis Complete",
-        description: `Candidate: ${result.isCandidate}, Approved: ${result.hasApprovedCandidateRequest}. Check console for details.`,
-      });
-    } else {
-      toast({
-        title: "User Not Found",
-        description: "This user doesn't exist in the system",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleDebugLogin = async () => {
-    if (!formData.email || !formData.password) {
-      toast({
-        title: "Enter credentials first",
-        description: "Please enter both email and password",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    const result = await debugLogin(formData.email, formData.password);
-    
-    if (result.success) {
-      toast({
-        title: "Debug Login Successful",
-        description: "Login worked! Check console for details.",
-      });
-    } else {
-      toast({
-        title: "Debug Login Failed",
-        description: result.error || "Check console for details",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleTestUser = async () => {
-    if (!formData.email) {
-      toast({
-        title: "Enter email first",
-        description: "Please enter an email address",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    const result = await testSpecificUser(formData.email);
-    
-    if (result.exists) {
-      toast({
-        title: "User Analysis Complete",
-        description: `User exists, is candidate: ${result.isCandidate}. Check console for details.`,
-      });
-    } else {
-      toast({
-        title: "User Not Found",
-        description: "This user doesn't exist in the system",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleResetCandidate = async () => {
-    if (!formData.email) {
-      toast({
-        title: "Enter email first",
-        description: "Please enter an email address",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    const result = await resetAndCreateCandidate(formData.email);
-    
-    if (result.success) {
-      toast({
-        title: "Candidate Reset Complete",
-        description: result.message,
-      });
-    } else {
-      toast({
-        title: "Reset Failed",
-        description: result.error?.message || "Check console for details",
-        variant: "destructive"
-      });
-    }
-  };
-
-  // Clean Supabase auth keys to avoid limbo states
-  const cleanupAuthState = () => {
+  // Debug function to check database state
+  const debugDatabaseState = async (userId: string) => {
     try {
-      // Local storage
-      Object.keys(localStorage).forEach((key) => {
-        if (key.startsWith("supabase.auth.") || key.includes("sb-")) {
-          localStorage.removeItem(key);
-        }
-      });
-      // Session storage
-      Object.keys(sessionStorage).forEach((key) => {
-        if (key.startsWith("supabase.auth.") || key.includes("sb-")) {
-          sessionStorage.removeItem(key);
-        }
-      });
-    } catch {
-      // no-op
+      console.log("🔍 Debugging database state for user:", userId);
+      
+      // Check user roles
+      const { data: roles, error: rolesError } = await supabase
+        .from("user_roles")
+        .select("*")
+        .eq("user_id", userId);
+      console.log("👥 User roles:", { roles, rolesError });
+      
+      // Check candidate onboarding requests
+      const { data: candidateRequests, error: candidateError } = await supabase
+        .from("candidate_onboarding_requests")
+        .select("*")
+        .eq("user_id", userId);
+      console.log("🎯 Candidate requests:", { candidateRequests, candidateError });
+      
+      // Check mentor onboarding requests
+      const { data: mentorRequests, error: mentorError } = await supabase
+        .from("mentor_onboarding_requests")
+        .select("*")
+        .eq("user_id", userId);
+      console.log("🧑‍🏫 Mentor requests:", { mentorRequests, mentorError });
+      
+      // Check profiles
+      const { data: profiles, error: profilesError } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId);
+      console.log("👤 Profiles:", { profiles, profilesError });
+      
+    } catch (error) {
+      console.error("❌ Debug error:", error);
     }
   };
 
-  // Redirect user based on role
+  // Redirect user based on role and approval status
   const redirectByRole = async (userId: string) => {
-    let target = "/candidate/dashboard";
     try {
+      console.log("🔍 Starting redirectByRole for user:", userId);
+      
+      // Debug database state first
+      await debugDatabaseState(userId);
+      
       const { data: roles, error } = await supabase
         .from("user_roles")
         .select("role")
@@ -265,31 +75,141 @@ export default function Login() {
 
       if (!error && roles && roles.length > 0) {
         const roleValues = roles.map((r: any) => r.role);
-        if (roleValues.includes("super_admin") || roleValues.includes("admin")) {
-          target = "/admin/dashboard";
+        console.log("✅ User roles found:", roleValues);
+        
+        // Check onboarding status for the user's role
+        let onboardingStatus = null;
+        if (roleValues.includes("candidate")) {
+          console.log("🔍 Checking candidate onboarding status...");
+          const { data: candidateRequest, error: candidateError } = await supabase
+            .from("candidate_onboarding_requests")
+            .select("status")
+            .eq("user_id", userId)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle(); // Use maybeSingle instead of single to avoid errors
+          
+          if (candidateError) {
+            console.error("❌ Error checking candidate status:", candidateError);
+          } else if (candidateRequest) {
+            onboardingStatus = candidateRequest.status;
+            console.log("✅ Candidate onboarding status:", onboardingStatus);
+          } else {
+            console.log("⚠️ No candidate onboarding request found");
+            onboardingStatus = "not_found";
+          }
         } else if (roleValues.includes("mentor")) {
-          target = "/mentor/dashboard";
-        } else if (roleValues.includes("candidate")) {
-          target = "/candidate/dashboard";
+          console.log("🔍 Checking mentor onboarding status...");
+          const { data: mentorRequest, error: mentorError } = await supabase
+            .from("mentor_onboarding_requests")
+            .select("status")
+            .eq("user_id", userId)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle(); // Use maybeSingle instead of single to avoid errors
+          
+          if (mentorError) {
+            console.error("❌ Error checking mentor status:", mentorError);
+          } else if (mentorRequest) {
+            onboardingStatus = mentorRequest.status;
+            console.log("✅ Mentor onboarding status:", onboardingStatus);
+          } else {
+            console.log("⚠️ No mentor onboarding request found");
+            onboardingStatus = "not_found";
+          }
         }
+
+        console.log("🎯 Final onboarding status:", onboardingStatus);
+
+        // Redirect based on role and onboarding status
+        if (roleValues.includes("super_admin") || roleValues.includes("admin")) {
+          console.log("🚀 Redirecting admin to admin dashboard");
+          navigate("/admin/dashboard");
+        } else if (roleValues.includes("mentor")) {
+          if (onboardingStatus === "approved") {
+            console.log("🔍 Checking if mentor profile is complete...");
+            // Check if profile is complete
+            const { data: mentorRequest, error: mentorError } = await supabase
+              .from("mentor_onboarding_requests")
+              .select("data")
+              .eq("user_id", userId)
+              .eq("status", "approved")
+              .maybeSingle(); // Use maybeSingle to avoid errors
+            
+            if (mentorError) {
+              console.error("❌ Error checking mentor profile data:", mentorError);
+              navigate("/onboarding/pending-approval");
+            } else if (mentorRequest?.data && Object.keys(mentorRequest.data).length > 1) {
+              console.log("🚀 Mentor profile complete, going to dashboard");
+              navigate("/mentor/dashboard");
+            } else {
+              console.log("📝 Mentor profile incomplete, going to onboarding");
+              navigate("/onboarding/mentor");
+            }
+          } else if (onboardingStatus === "pending") {
+            console.log("⏳ Mentor approval pending, going to pending approval");
+            navigate("/onboarding/pending-approval");
+          } else if (onboardingStatus === "not_found") {
+            console.log("❓ No mentor onboarding request found, going to pending approval");
+            navigate("/onboarding/pending-approval");
+          } else {
+            console.log("❓ Unknown mentor status, going to pending approval");
+            navigate("/onboarding/pending-approval");
+          }
+        } else if (roleValues.includes("candidate")) {
+          if (onboardingStatus === "approved") {
+            console.log("🔍 Checking if candidate profile is complete...");
+            // Check if profile is complete
+            const { data: candidateRequest, error: candidateError } = await supabase
+              .from("candidate_onboarding_requests")
+              .select("data")
+              .eq("user_id", userId)
+              .eq("status", "approved")
+              .maybeSingle(); // Use maybeSingle to avoid errors
+            
+            if (candidateError) {
+              console.error("❌ Error checking candidate profile data:", candidateError);
+              navigate("/onboarding/pending-approval");
+            } else if (candidateRequest?.data && Object.keys(candidateRequest.data).length > 1) {
+              console.log("🚀 Candidate profile complete, going to dashboard");
+              navigate("/candidate/dashboard");
+            } else {
+              console.log("📝 Candidate profile incomplete, going to onboarding");
+              navigate("/onboarding/candidate");
+            }
+          } else if (onboardingStatus === "pending") {
+            console.log("⏳ Candidate approval pending, going to pending approval");
+            navigate("/onboarding/pending-approval");
+          } else if (onboardingStatus === "not_found") {
+            console.log("❓ No candidate onboarding request found, going to pending approval");
+            navigate("/onboarding/pending-approval");
+          } else {
+            console.log("❓ Unknown candidate status, going to pending approval");
+            navigate("/onboarding/pending-approval");
+          }
+        } else {
+          console.log("❓ Unknown role, going to pending approval");
+          navigate("/onboarding/pending-approval");
+        }
+      } else {
+        console.error("❌ No roles found for user:", userId);
+        navigate("/onboarding/pending-approval");
       }
-    } catch {
-      // fall back to default target
+    } catch (error) {
+      console.error("❌ Role redirect error:", error);
+      navigate("/onboarding/pending-approval");
     }
-    window.location.href = target;
   };
 
   // Handle OAuth return and already-authenticated users
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_IN" && session?.user) {
-        // Defer to avoid deadlocks
-        setTimeout(() => {
-          redirectByRole(session.user!.id);
-        }, 0);
+        redirectByRole(session.user.id);
       }
     });
 
+    // Check if user is already signed in
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         redirectByRole(session.user.id);
@@ -307,62 +227,29 @@ export default function Login() {
 
     try {
       console.log("🔐 Starting login process...");
-      console.log("Email:", formData.email);
-      console.log("Password length:", formData.password?.length);
       
-      // Validate input first
+      // Validate input
       if (!formData.email || !formData.email.includes("@")) {
         throw new Error("Please enter a valid email address");
       }
       
-      if (!formData.password || formData.password.length < 6) {
-        throw new Error("Password must be at least 6 characters long");
+      if (!formData.password || formData.password.length < 1) {
+        throw new Error("Please enter your password");
       }
 
-      // Clean up any previous sessions
-      console.log("🧹 Cleaning up previous sessions...");
-      cleanupAuthState();
-      try {
-        await supabase.auth.signOut({ scope: "global" });
-      } catch {
-        // ignore
-      }
-
-      console.log("📡 Attempting login with Supabase...");
+      // Attempt login
       const { data, error } = await supabase.auth.signInWithPassword({
         email: formData.email.trim(),
         password: formData.password,
       });
 
-      console.log("Login response received:", {
-        hasUser: !!data.user,
-        hasSession: !!data.session,
-        errorPresent: !!error
-      });
-
       if (error || !data.user) {
-        // Enhanced error logging for debugging
-        console.error("Login error details:", {
-          error,
-          email: formData.email,
-          errorMessage: error?.message,
-          errorStatus: error?.status,
-          errorName: error?.name,
-          userData: data?.user
-        });
+        console.error("Login error:", error);
         
         let errorMessage = "Please check your credentials and try again.";
         
-        if (error?.status === 400) {
-          errorMessage = "Bad request: The login credentials are malformed. Please try again or contact support.";
-          console.error("🚨 400 Bad Request - Possible causes:", {
-            emailFormat: formData.email.includes("@") ? "valid" : "invalid",
-            passwordLength: formData.password?.length,
-            trimmedEmail: formData.email.trim(),
-            supabaseUrl: supabase.supabaseUrl
-          });
-        } else if (error?.message?.includes("Invalid login credentials")) {
-          errorMessage = "Invalid email or password. The user may not exist or the password is incorrect.";
+        if (error?.message?.includes("Invalid login credentials")) {
+          errorMessage = "Invalid email or password. Please check your credentials.";
         } else if (error?.message?.includes("Email not confirmed")) {
           errorMessage = "Please check your email and click the confirmation link before signing in.";
         } else if (error?.message?.includes("Too many requests")) {
@@ -385,16 +272,9 @@ export default function Login() {
     } catch (error: any) {
       console.error("❌ Login failed:", error);
       
-      let displayMessage = error?.message || "Please check your credentials and try again.";
-      
-      // Add specific guidance for common issues
-      if (error?.message?.includes("400") || error?.message?.includes("Bad request")) {
-        displayMessage += " If this persists, try using the 'Debug Login' tool below.";
-      }
-      
       toast({
         title: "Login failed",
-        description: displayMessage,
+        description: error.message || "Please check your credentials and try again.",
         variant: "destructive",
       });
     } finally {
@@ -405,24 +285,16 @@ export default function Login() {
   const handleGoogleLogin = async () => {
     setIsLoading(true);
     try {
-      // Clean up any previous sessions
-      cleanupAuthState();
-      try {
-        await supabase.auth.signOut({ scope: "global" });
-      } catch {
-        // ignore
-      }
-
-      const redirectUrl = `${window.location.origin}/auth/login`;
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: redirectUrl,
+          redirectTo: `${window.location.origin}/auth/login`,
         },
       });
+      
       if (error) throw error;
-
-      // After OAuth, Supabase redirects back; useEffect handles the final redirect
+      
+      // OAuth redirect will handle the rest via useEffect
     } catch (error: any) {
       toast({
         title: "Google login failed",
@@ -552,118 +424,6 @@ export default function Login() {
             Sign up for free
           </Link>
         </p>
-
-        {/* Debug Panel - Development Only */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="mt-8 p-4 border border-orange-200 bg-orange-50 rounded-lg">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-medium text-orange-800">Debug Tools</h3>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowDebug(!showDebug)}
-              >
-                <Bug className="h-4 w-4 mr-1" />
-                {showDebug ? 'Hide' : 'Show'} Debug
-              </Button>
-            </div>
-            
-            {showDebug && (
-              <div className="space-y-2">
-                <p className="text-xs text-orange-700 mb-3">
-                  Use these tools to debug login issues. Check browser console for detailed output.
-                </p>
-                
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleDebugUser}
-                    disabled={!formData.email}
-                  >
-                    Check User
-                  </Button>
-                  
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handlePasswordReset}
-                    disabled={!formData.email}
-                  >
-                    Reset Password
-                  </Button>
-                  
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleCreateUser}
-                    disabled={!formData.email}
-                  >
-                    Create User
-                  </Button>
-
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleCreateCandidate}
-                    disabled={!formData.email}
-                  >
-                    Create Candidate
-                  </Button>
-
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleCheckComplete}
-                    disabled={!formData.email}
-                  >
-                    Check Complete
-                  </Button>
-
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleDebugLogin}
-                    disabled={!formData.email || !formData.password}
-                  >
-                    Debug Login
-                  </Button>
-
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleTestUser}
-                    disabled={!formData.email}
-                  >
-                    Test Specific User
-                  </Button>
-
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleResetCandidate}
-                    disabled={!formData.email}
-                  >
-                    Reset Candidate
-                  </Button>
-                </div>
-                
-                <div className="mt-3 p-2 bg-white rounded text-xs">
-                  <strong>Quick Test:</strong> Enter "zahid@ideas2it.com" and click "Check User" to debug the specific issue.
-                </div>
-              </div>
-            )}
-          </div>
-        )}
       </form>
     </AuthLayout>
   );

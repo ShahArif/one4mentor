@@ -28,7 +28,9 @@ export function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps)
   }
 
   if (requiredRoles && requiredRoles.length > 0 && !hasAnyRole(requiredRoles)) {
-    return <Navigate to="/dashboard" replace />;
+    // Redirect to appropriate dashboard based on user role
+    // For now, redirect to candidate dashboard as fallback
+    return <Navigate to="/candidate/dashboard" replace />;
   }
 
   return <>{children}</>;

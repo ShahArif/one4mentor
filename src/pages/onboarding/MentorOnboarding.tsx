@@ -198,29 +198,63 @@ export default function MentorOnboarding() {
         formData: formData
       });
 
-      // Save onboarding data to Supabase with "pending" status for admin approval
-      const { error: insertError } = await supabase
+      // Check if there's an existing mentor request
+      const { data: existingRequest, error: checkError } = await supabase
         .from("mentor_onboarding_requests")
-        .insert({
-          user_id: user.id,
-          data: formData,
-          status: "pending" // This will require admin approval
-        });
+        .select("id, status")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
 
-      if (insertError) {
-        console.error("Insert error:", insertError);
-        throw insertError;
+      if (checkError && checkError.code !== "PGRST116") {
+        console.error("Check error:", checkError);
+        throw checkError;
       }
 
-      console.log("✅ Mentor application submitted successfully");
+      if (existingRequest) {
+        // Update existing record with complete profile data
+        console.log("📝 Updating existing mentor profile...");
+        const { error: updateError } = await supabase
+          .from("mentor_onboarding_requests")
+          .update({
+            data: formData,
+            status: "approved" // Changed from "complete" to "approved" - valid enum value
+          })
+          .eq("id", existingRequest.id);
+
+        if (updateError) {
+          console.error("Update error:", updateError);
+          throw updateError;
+        }
+        
+        console.log("✅ Mentor profile updated successfully");
+      } else {
+        // Create new complete mentor record (fallback)
+        console.log("📝 Creating new mentor profile...");
+        const { error: insertError } = await supabase
+          .from("mentor_onboarding_requests")
+          .insert({
+            user_id: user.id,
+            data: formData,
+            status: "approved" // Changed from "complete" to "approved" - valid enum value
+          });
+
+        if (insertError) {
+          console.error("Insert error:", insertError);
+          throw insertError;
+        }
+
+        console.log("✅ New mentor profile created successfully");
+      }
 
       toast({
-        title: "Application Submitted Successfully! 🎉",
-        description: "Your mentor application has been submitted for review by our admin team. You'll receive a notification once it's approved.",
+        title: "Profile Completed Successfully! 🎉",
+        description: "Your mentor profile has been completed. You now have access to all platform features.",
       });
 
-      // Redirect to a pending approval page instead of dashboard
-      navigate("/onboarding/pending-approval");
+      // Redirect to mentor dashboard since profile is complete
+      navigate("/mentor/dashboard");
     } catch (error: any) {
       console.error("Error submitting mentor application:", error);
       

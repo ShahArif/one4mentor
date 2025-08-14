@@ -8,7 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { AuthLayout } from "@/components/auth/AuthLayout";
 import { RoleSelector, UserRole } from "@/components/auth/RoleSelector";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, EyeOff, Mail, Lock, User, CheckCircle } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, User, CheckCircle, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 export default function Register() {
@@ -99,7 +99,8 @@ export default function Register() {
           data: {
             display_name: `${formData.firstName} ${formData.lastName}`.trim(),
             first_name: formData.firstName,
-            last_name: formData.lastName
+            last_name: formData.lastName,
+            role: selectedRole // Store role in user metadata
           }
         }
       });
@@ -116,57 +117,137 @@ export default function Register() {
       const userId = authData.user.id;
       console.log("✅ Auth user created:", userId);
 
-      // Step 2: Create/update profile
-      const { error: profileError } = await supabase
+      // Step 2: Create profile (this should work now with the RLS fix)
+      // First check if profile already exists
+      const { data: existingProfile, error: checkError } = await supabase
         .from("profiles")
-        .upsert({
-          id: userId,
-          email: formData.email.trim(),
-          display_name: `${formData.firstName} ${formData.lastName}`.trim(),
-          created_at: new Date().toISOString()
-        });
+        .select("id")
+        .eq("id", userId)
+        .maybeSingle();
 
-      if (profileError) {
-        console.warn("Profile creation warning:", profileError);
-      } else {
-        console.log("✅ Profile created");
+      if (checkError) {
+        console.error("❌ Error checking existing profile:", checkError);
+        throw new Error(`Failed to check profile: ${checkError.message}`);
       }
 
-      // Step 3: Assign user role
-      const { error: roleError } = await supabase
-        .from("user_roles")
-        .insert({
-          user_id: userId,
-          role: selectedRole
-        });
-
-      if (roleError) {
-        console.warn("Role assignment warning:", roleError);
+      if (existingProfile) {
+        console.log("⚠️ Profile already exists for user:", userId);
       } else {
+        // Create new profile only if it doesn't exist
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .insert({
+            id: userId,
+            email: formData.email.trim(),
+            display_name: `${formData.firstName} ${formData.lastName}`.trim(),
+            created_at: new Date().toISOString()
+          });
+
+        if (profileError) {
+          console.error("❌ Profile creation failed:", profileError);
+          // Don't fail registration for profile creation error
+          console.warn("⚠️ Continuing with role assignment despite profile creation failure");
+        } else {
+          console.log("✅ Profile created successfully");
+        }
+      }
+
+      // Step 3: Assign role to user
+      // First check if role already exists
+      const { data: existingRole, error: roleCheckError } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (roleCheckError) {
+        console.error("❌ Error checking existing role:", roleCheckError);
+        throw new Error(`Failed to check role: ${roleCheckError.message}`);
+      }
+
+      if (existingRole) {
+        console.log("⚠️ Role already assigned for user:", userId, "Role:", existingRole.role);
+      } else {
+        // Assign new role only if it doesn't exist
+        const { error: roleError } = await supabase
+          .from("user_roles")
+          .insert({
+            user_id: userId,
+            role: selectedRole // This will be "candidate" or "mentor" based on user's choice
+          });
+
+        if (roleError) {
+          console.error("❌ Role assignment failed:", roleError);
+          throw new Error(`Failed to assign role: ${roleError.message}`);
+        }
+
         console.log("✅ Role assigned:", selectedRole);
       }
 
-      // Step 4: Handle role-specific setup
+      // Step 4: Handle role-specific setup - Create basic records only
       if (selectedRole === "candidate") {
-        // Create a basic approved candidate request so they can immediately access features
-        const { error: candidateError } = await supabase
+        // Check if candidate onboarding request already exists
+        const { data: existingCandidateRequest, error: candidateCheckError } = await supabase
           .from("candidate_onboarding_requests")
-          .insert({
-            user_id: userId,
-            data: {
-              fullName: `${formData.firstName} ${formData.lastName}`.trim(),
-              experience: "Entry Level", // Default
-              goals: "Professional Development", // Default
-              skills: [], // Empty initially
-              bio: "New candidate - profile incomplete"
-            },
-            status: "approved" // Auto-approve so they can use the platform
-          });
+          .select("id")
+          .eq("user_id", userId)
+          .maybeSingle();
 
-        if (candidateError) {
-          console.warn("Candidate setup warning:", candidateError);
+        if (candidateCheckError) {
+          console.warn("⚠️ Error checking existing candidate request:", candidateCheckError);
+        } else if (existingCandidateRequest) {
+          console.log("⚠️ Candidate onboarding request already exists for user:", userId);
         } else {
-          console.log("✅ Candidate setup complete");
+          // Create a basic candidate record with 'pending' status for admin approval
+          const { error: candidateError } = await supabase
+            .from("candidate_onboarding_requests")
+            .insert({
+              user_id: userId,
+              data: {
+                fullName: `${formData.firstName} ${formData.lastName}`.trim(),
+                // No other details - user must complete profile after login
+              },
+              status: "pending" // Changed to "pending" - requires admin approval
+            });
+
+          if (candidateError) {
+            console.warn("⚠️ Candidate setup warning:", candidateError);
+            // Don't fail the registration for this
+          } else {
+            console.log("✅ Candidate basic record created");
+          }
+        }
+      } else if (selectedRole === "mentor") {
+        // Check if mentor onboarding request already exists
+        const { data: existingMentorRequest, error: mentorCheckError } = await supabase
+          .from("mentor_onboarding_requests")
+          .select("id")
+          .eq("user_id", userId)
+          .maybeSingle();
+
+        if (mentorCheckError) {
+          console.warn("⚠️ Error checking existing mentor request:", mentorCheckError);
+        } else if (existingMentorRequest) {
+          console.log("⚠️ Mentor onboarding request already exists for user:", userId);
+        } else {
+          // Create a basic mentor record with 'pending' status for admin approval
+          const { error: mentorError } = await supabase
+            .from("mentor_onboarding_requests")
+            .insert({
+              user_id: userId,
+              data: {
+                fullName: `${formData.firstName} ${formData.lastName}`.trim(),
+                // No other details - user must complete profile after login
+              },
+              status: "pending" // Changed to "pending" - requires admin approval
+            });
+
+          if (mentorError) {
+            console.warn("⚠️ Mentor setup warning:", mentorError);
+            // Don't fail the registration for this
+          } else {
+            console.log("✅ Mentor basic record created");
+          }
         }
       }
 
@@ -174,25 +255,12 @@ export default function Register() {
 
       toast({
         title: "Account created successfully! 🎉",
-        description: authData.user.email_confirmed_at 
-          ? "You can now log in and start using the platform."
-          : "Please check your email to confirm your account, then log in.",
+        description: "You can now log in and start using the platform.",
       });
 
-      // Redirect based on email confirmation status
-      if (authData.user.email_confirmed_at) {
-        // User is already confirmed, redirect to appropriate dashboard
-        if (selectedRole === "candidate") {
-          navigate("/candidate/dashboard");
-        } else if (selectedRole === "mentor") {
-          navigate("/mentor/dashboard");
-        } else {
-          navigate("/dashboard");
-        }
-      } else {
-        // Need email confirmation, redirect to login with message
-        navigate("/auth/login");
-      }
+      // Since email confirmation is disabled, redirect to pending approval
+      // Users need admin approval before they can complete their profiles
+      navigate("/onboarding/pending-approval");
 
     } catch (error: any) {
       console.error("❌ Registration failed:", error);
@@ -207,11 +275,15 @@ export default function Register() {
         errorMessage = "Invalid email address. Please check and try again.";
       } else if (error.message?.includes("network")) {
         errorMessage = "Network error. Please check your connection and try again.";
+      } else if (error.message?.includes("Failed to create profile")) {
+        errorMessage = "Account created but profile setup failed. Please contact support.";
+      } else if (error.message?.includes("Failed to assign role")) {
+        errorMessage = "Account created but role assignment failed. Please contact support.";
       }
       
       toast({
         title: "Registration failed",
-        description: error.message || errorMessage,
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -313,6 +385,7 @@ export default function Register() {
             Real Supabase integration - your account will be created immediately
           </div>
         </div>
+
         {/* Name fields */}
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
@@ -433,7 +506,7 @@ export default function Register() {
           className="w-full btn-gradient"
           disabled={isLoading}
         >
-          {isLoading ? "Creating your account..." : "Create Account (Real Supabase!)"}
+          {isLoading ? "Creating your account..." : "Create Account"}
         </Button>
 
         {/* Divider */}
@@ -460,7 +533,7 @@ export default function Register() {
             <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
             <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
           </svg>
-          Continue with Google (Working!)
+          Continue with Google
         </Button>
 
         {/* Back to role selection */}

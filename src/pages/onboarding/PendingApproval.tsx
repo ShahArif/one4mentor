@@ -1,251 +1,328 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  Clock, 
-  CheckCircle, 
-  XCircle, 
-  AlertCircle, 
-  Mail, 
-  Home,
-  RefreshCw
-} from "lucide-react";
+import { Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+
+interface ApprovalStatus {
+  status: "pending" | "approved" | "rejected" | "not_found" | "incomplete";
+  type: "candidate" | "mentor" | null;
+  message: string;
+}
 
 export default function PendingApproval() {
+  const [status, setStatus] = useState<ApprovalStatus | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [approvalStatus, setApprovalStatus] = useState<{
-    mentorStatus?: string;
-    candidateStatus?: string;
-    isLoading: boolean;
-  }>({ isLoading: true });
-
-  const checkApprovalStatus = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        navigate("/auth/login");
-        return;
-      }
-
-      // Check mentor onboarding status
-      const { data: mentorData } = await supabase
-        .from("mentor_onboarding_requests")
-        .select("status")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
-
-      // Check candidate onboarding status
-      const { data: candidateData } = await supabase
-        .from("candidate_onboarding_requests")
-        .select("status")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
-
-      setApprovalStatus({
-        mentorStatus: mentorData?.status,
-        candidateStatus: candidateData?.status,
-        isLoading: false
-      });
-
-      // If approved, check if roles are assigned and redirect accordingly
-      if (mentorData?.status === "approved" || candidateData?.status === "approved") {
-        const { data: roles } = await supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", user.id);
-
-        if (roles && roles.length > 0) {
-          // User has been approved and roles assigned
-          const userRoles = roles.map(r => r.role);
-          if (userRoles.includes("mentor")) {
-            navigate("/mentor/dashboard");
-          } else if (userRoles.includes("candidate")) {
-            navigate("/candidate/dashboard");
-          }
-        }
-      }
-
-    } catch (error) {
-      console.error("Error checking approval status:", error);
-      setApprovalStatus({ isLoading: false });
-    }
-  };
 
   useEffect(() => {
+    const checkApprovalStatus = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (!user) {
+          navigate("/auth/login");
+          return;
+        }
+
+        // Check candidate onboarding requests
+        const { data: candidateRequests, error: candidateError } = await supabase
+          .from("candidate_onboarding_requests")
+          .select("status")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(); // Use maybeSingle to avoid "0 rows" error
+
+        if (candidateError) {
+          console.error("❌ Error checking candidate requests:", candidateError);
+          setStatus({
+            status: "not_found",
+            type: null,
+            message: "Error checking status. Please try again or contact support."
+          });
+          return;
+        }
+
+        if (candidateRequests) {
+          const request = candidateRequests;
+          if (request.status === "approved") {
+            // Check if profile is complete
+            const { data: profileData, error: profileError } = await supabase
+              .from("candidate_onboarding_requests")
+              .select("data")
+              .eq("user_id", user.id)
+              .eq("status", "approved")
+              .maybeSingle(); // Use maybeSingle to avoid "0 rows" error
+            
+            if (profileError) {
+              console.error("❌ Error checking profile data:", profileError);
+              setStatus({
+                status: "not_found",
+                type: null,
+                message: "Error checking profile status. Please try again or contact support."
+              });
+              return;
+            }
+            
+            if (profileData?.data && Object.keys(profileData.data).length > 1) {
+              // Profile complete, go to dashboard
+              setStatus({
+                status: "approved",
+                type: "candidate",
+                message: "Your candidate application has been approved and profile is complete! You can now access all platform features."
+              });
+              setTimeout(() => navigate("/candidate/dashboard"), 3000);
+            } else {
+              // Profile incomplete, go to onboarding
+              setStatus({
+                status: "incomplete",
+                type: "candidate",
+                message: "Your candidate application has been approved! Please complete your profile to continue."
+              });
+              setTimeout(() => navigate("/onboarding/candidate"), 2000);
+            }
+          } else if (request.status === "rejected") {
+            setStatus({
+              status: "rejected",
+              type: "candidate",
+              message: "Your candidate application was not approved. Please contact support for more information."
+            });
+          } else {
+            setStatus({
+              status: "pending",
+              type: "candidate",
+              message: "Your candidate application is under review. We'll notify you once it's approved."
+            });
+          }
+          return;
+        }
+
+        // Check mentor onboarding requests
+        const { data: mentorRequests, error: mentorError } = await supabase
+          .from("mentor_onboarding_requests")
+          .select("status")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(); // Use maybeSingle to avoid "0 rows" error
+
+        if (mentorError) {
+          console.error("❌ Error checking mentor requests:", mentorError);
+          setStatus({
+            status: "not_found",
+            type: null,
+            message: "Error checking status. Please try again or contact support."
+          });
+          return;
+        }
+
+        if (mentorRequests) {
+          const request = mentorRequests;
+          if (request.status === "approved") {
+            // Check if profile is complete
+            const { data: profileData, error: profileError } = await supabase
+              .from("mentor_onboarding_requests")
+              .select("data")
+              .eq("user_id", user.id)
+              .eq("status", "approved")
+              .maybeSingle(); // Use maybeSingle to avoid "0 rows" error
+            
+            if (profileError) {
+              console.error("❌ Error checking profile data:", profileError);
+              setStatus({
+                status: "not_found",
+                type: null,
+                message: "Error checking profile status. Please try again or contact support."
+              });
+              return;
+            }
+            
+            if (profileData?.data && Object.keys(profileData.data).length > 1) {
+              // Profile complete, go to dashboard
+              setStatus({
+                status: "approved",
+                type: "mentor",
+                message: "Your mentor application has been approved and profile is complete! You can now access all platform features."
+              });
+              setTimeout(() => navigate("/mentor/dashboard"), 3000);
+            } else {
+              // Profile incomplete, go to onboarding
+              setStatus({
+                status: "incomplete",
+                type: "mentor",
+                message: "Your mentor application has been approved! Please complete your profile to continue."
+              });
+              setTimeout(() => navigate("/onboarding/mentor"), 2000);
+            }
+          } else if (request.status === "rejected") {
+            setStatus({
+              status: "rejected",
+              type: "mentor",
+              message: "Your mentor application was not approved. Please contact support for more information."
+            });
+          } else {
+            setStatus({
+              status: "pending",
+              type: "mentor",
+              message: "Your mentor application is under review. We'll notify you once it's approved."
+            });
+          }
+          return;
+        }
+
+        // No application found
+        setStatus({
+          status: "not_found",
+          type: null,
+          message: "No application found. Please complete your onboarding process."
+        });
+
+      } catch (error) {
+        console.error("Error checking approval status:", error);
+        setStatus({
+          status: "not_found",
+          type: null,
+          message: "Error checking status. Please try again or contact support."
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
     checkApprovalStatus();
-  }, []);
+  }, [navigate]);
 
-  const getStatusBadge = (status?: string) => {
-    switch (status) {
-      case "pending":
-        return <Badge variant="secondary" className="flex items-center gap-1">
-          <Clock className="h-3 w-3" />
-          Pending Review
-        </Badge>;
-      case "approved":
-        return <Badge variant="default" className="flex items-center gap-1">
-          <CheckCircle className="h-3 w-3" />
-          Approved
-        </Badge>;
-      case "rejected":
-        return <Badge variant="destructive" className="flex items-center gap-1">
-          <XCircle className="h-3 w-3" />
-          Rejected
-        </Badge>;
-      default:
-        return null;
-    }
-  };
-
-  const hasAnyApplication = approvalStatus.mentorStatus || approvalStatus.candidateStatus;
-  const isAnyApproved = approvalStatus.mentorStatus === "approved" || approvalStatus.candidateStatus === "approved";
-  const isAnyRejected = approvalStatus.mentorStatus === "rejected" || approvalStatus.candidateStatus === "rejected";
-
-  if (approvalStatus.isLoading) {
+  if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-hero">
-        <div className="flex items-center space-x-2">
-          <RefreshCw className="h-4 w-4 animate-spin" />
-          <span>Checking approval status...</span>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Checking your application status...</p>
         </div>
       </div>
     );
   }
 
+  if (!status) {
+    return null;
+  }
+
+  const getStatusIcon = () => {
+    switch (status.status) {
+      case "pending":
+        return <Clock className="h-16 w-16 text-yellow-500" />;
+      case "approved":
+        return <CheckCircle className="h-16 w-16 text-green-500" />;
+      case "rejected":
+        return <XCircle className="h-16 w-16 text-red-500" />;
+      case "incomplete":
+        return <AlertCircle className="h-16 w-16 text-orange-500" />;
+      default:
+        return <AlertCircle className="h-16 w-16 text-gray-500" />;
+    }
+  };
+
+  const getStatusColor = () => {
+    switch (status.status) {
+      case "pending":
+        return "text-yellow-600";
+      case "approved":
+        return "text-green-600";
+      case "rejected":
+        return "text-red-600";
+      case "incomplete":
+        return "text-orange-600";
+      default:
+        return "text-gray-600";
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-hero">
-      <div className="container max-w-2xl py-16">
-        <Card className="shadow-xl">
-          <CardHeader className="text-center pb-6">
-            {!hasAnyApplication ? (
-              <AlertCircle className="h-16 w-16 mx-auto mb-4 text-yellow-500" />
-            ) : isAnyApproved ? (
-              <CheckCircle className="h-16 w-16 mx-auto mb-4 text-green-500" />
-            ) : isAnyRejected ? (
-              <XCircle className="h-16 w-16 mx-auto mb-4 text-red-500" />
-            ) : (
-              <Clock className="h-16 w-16 mx-auto mb-4 text-blue-500" />
-            )}
-            
-            <CardTitle className="text-2xl mb-2">
-              {!hasAnyApplication ? "No Application Found" :
-               isAnyApproved ? "Application Approved! 🎉" :
-               isAnyRejected ? "Application Status Update" :
-               "Application Under Review"}
-            </CardTitle>
-          </CardHeader>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="max-w-md w-full space-y-8 p-8">
+        <div className="text-center">
+          {getStatusIcon()}
           
-          <CardContent className="space-y-6">
-            {!hasAnyApplication ? (
-              <div className="text-center">
-                <p className="text-muted-foreground mb-6">
-                  We couldn't find any application associated with your account. 
-                  Please complete the onboarding process to get started.
+          <h2 className="mt-6 text-3xl font-bold text-gray-900">
+            {status.status === "pending" && "Application Under Review"}
+            {status.status === "approved" && "Application Approved!"}
+            {status.status === "rejected" && "Application Not Approved"}
+            {status.status === "incomplete" && "Profile Incomplete"}
+            {status.status === "not_found" && "No Application Found"}
+          </h2>
+          
+          <p className={`mt-4 text-lg ${getStatusColor()}`}>
+            {status.message}
+          </p>
+          
+          {status.status === "pending" && (
+            <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-sm text-yellow-700">
+                Our team is reviewing your application. This usually takes 1-2 business days.
+                You'll receive an email notification once the review is complete.
+              </p>
+            </div>
+          )}
+          
+          {status.status === "approved" && (
+            <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-sm text-green-700">
+                You'll be redirected to your dashboard shortly. Welcome to the platform!
+              </p>
+            </div>
+          )}
+          
+          {status.status === "rejected" && (
+            <div className="mt-6 space-y-4">
+              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-700">
+                  If you have questions about this decision, please contact our support team.
                 </p>
-                <div className="flex gap-3 justify-center">
-                  <Button asChild>
-                    <a href="/onboarding/mentor">Apply as Mentor</a>
-                  </Button>
-                  <Button asChild variant="outline">
-                    <a href="/onboarding/candidate">Apply as Candidate</a>
-                  </Button>
-                </div>
               </div>
-            ) : (
-              <>
-                {/* Application Status */}
-                <div className="space-y-4">
-                  <h3 className="font-semibold">Application Status:</h3>
-                  
-                  {approvalStatus.mentorStatus && (
-                    <div className="flex items-center justify-between p-3 border rounded-lg">
-                      <span>Mentor Application</span>
-                      {getStatusBadge(approvalStatus.mentorStatus)}
-                    </div>
-                  )}
-                  
-                  {approvalStatus.candidateStatus && (
-                    <div className="flex items-center justify-between p-3 border rounded-lg">
-                      <span>Candidate Application</span>
-                      {getStatusBadge(approvalStatus.candidateStatus)}
-                    </div>
-                  )}
-                </div>
+              <Button 
+                onClick={() => navigate("/auth/login")}
+                className="w-full"
+              >
+                Return to Login
+              </Button>
+            </div>
+          )}
+          
+          {status.status === "incomplete" && (
+            <div className="mt-6 space-y-4">
+              <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                <p className="text-sm text-orange-700">
+                  Your profile is incomplete. Please complete your profile to continue.
+                </p>
+              </div>
+              <Button 
+                onClick={() => navigate("/onboarding/candidate")}
+                className="w-full"
+              >
+                Complete Profile
+              </Button>
+            </div>
+          )}
 
-                {/* Status-specific messages */}
-                <div className="bg-muted/50 p-4 rounded-lg">
-                  {isAnyApproved ? (
-                    <div>
-                      <h4 className="font-semibold text-green-700 mb-2">Congratulations!</h4>
-                      <p className="text-sm text-muted-foreground">
-                        Your application has been approved by our admin team. You can now access all platform features.
-                        If you're not automatically redirected, please refresh this page.
-                      </p>
-                    </div>
-                  ) : isAnyRejected ? (
-                    <div>
-                      <h4 className="font-semibold text-red-700 mb-2">Application Update</h4>
-                      <p className="text-sm text-muted-foreground">
-                        Unfortunately, your application was not approved at this time. 
-                        Please contact our support team for more information or to reapply.
-                      </p>
-                    </div>
-                  ) : (
-                    <div>
-                      <h4 className="font-semibold text-blue-700 mb-2">Review in Progress</h4>
-                      <p className="text-sm text-muted-foreground">
-                        Thank you for your application! Our admin team is currently reviewing your submission. 
-                        This process typically takes 1-2 business days. You'll receive an email notification 
-                        once your application has been reviewed.
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Next Steps */}
-                <div className="border-t pt-4">
-                  <h4 className="font-semibold mb-3">What happens next?</h4>
-                  <ul className="space-y-2 text-sm text-muted-foreground">
-                    <li className="flex items-center gap-2">
-                      <Mail className="h-4 w-4" />
-                      You'll receive an email notification about your application status
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4" />
-                      Once approved, you'll gain access to all platform features
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <Home className="h-4 w-4" />
-                      You can bookmark this page to check your status anytime
-                    </li>
-                  </ul>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex gap-3 pt-4">
-                  <Button onClick={checkApprovalStatus} variant="outline" className="flex-1">
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Refresh Status
-                  </Button>
-                  <Button onClick={() => navigate("/")} variant="outline" className="flex-1">
-                    <Home className="h-4 w-4 mr-2" />
-                    Go to Home
-                  </Button>
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
+          {status.status === "not_found" && (
+            <div className="mt-6 space-y-4">
+              <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                <p className="text-sm text-gray-700">
+                  It looks like you haven't completed the onboarding process yet.
+                </p>
+              </div>
+              <Button 
+                onClick={() => navigate("/auth/register")}
+                className="w-full"
+              >
+                Complete Registration
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
