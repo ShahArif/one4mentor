@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import CandidateOnlyRoute from "./components/auth/CandidateOnlyRoute";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/auth/Login";
@@ -29,6 +30,8 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminSetup from "./pages/admin/AdminSetup";
 import AdminLogin from "./pages/admin/AdminLogin";
 import RoleRedirect from "./pages/dashboard/RoleRedirect";
+import MentorshipRequests from "./pages/mentors/MentorshipRequests";
+import CandidateRequests from "./pages/candidate/CandidateRequests";
 
 const queryClient = new QueryClient();
 
@@ -69,9 +72,19 @@ const App = () => (
                 <CandidateDashboard />
               </ProtectedRoute>
             } />
+            <Route path="/candidate/requests" element={
+              <ProtectedRoute requiredRole="candidate">
+                <CandidateRequests />
+              </ProtectedRoute>
+            } />
             <Route path="/mentor/dashboard" element={
               <ProtectedRoute requiredRole="mentor">
                 <MentorDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/mentor/requests" element={
+              <ProtectedRoute requiredRole="mentor">
+                <MentorshipRequests />
               </ProtectedRoute>
             } />
             <Route path="/booking/:id" element={
@@ -84,10 +97,32 @@ const App = () => (
                 <BookingConfirmation />
               </ProtectedRoute>
             } />
+            {/* Sessions route - CANDIDATES ONLY - Protected at multiple levels */}
             <Route path="/sessions" element={
-              <ProtectedRoute>
+              <CandidateOnlyRoute fallbackPath="/auth/login">
                 <SessionManagement />
-              </ProtectedRoute>
+              </CandidateOnlyRoute>
+            } />
+            
+            {/* Additional protection: Redirect any direct access to sessions */}
+            <Route path="/sessions/*" element={
+              <CandidateOnlyRoute fallbackPath="/auth/login">
+                <SessionManagement />
+              </CandidateOnlyRoute>
+            } />
+            
+            {/* Catch any other sessions-related routes */}
+            <Route path="/session/*" element={
+              <CandidateOnlyRoute fallbackPath="/auth/login">
+                <SessionManagement />
+              </CandidateOnlyRoute>
+            } />
+            
+            {/* Catch any other variations of sessions routes */}
+            <Route path="/session" element={
+              <CandidateOnlyRoute fallbackPath="/auth/login">
+                <SessionManagement />
+              </CandidateOnlyRoute>
             } />
             <Route path="/chat" element={
               <ProtectedRoute>
