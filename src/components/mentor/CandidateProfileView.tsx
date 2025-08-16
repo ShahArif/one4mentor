@@ -21,6 +21,7 @@ import {
   Linkedin,
   Github
 } from "lucide-react";
+import { Label } from "@/components/ui/label";
 
 interface CandidateProfileViewProps {
   candidate: {
@@ -40,16 +41,16 @@ interface CandidateProfileViewProps {
       linkedinProfile?: string;
       githubProfile?: string;
       portfolioUrl?: string;
-      preferredMentorshipAreas?: string[];
-      availability?: string[];
-      timezone?: string;
     };
   };
   requestMessage: string;
   requestDate: string;
+  selectedSkills?: string[];
   onAccept?: () => void;
   onReject?: () => void;
   onMessage?: () => void;
+  onCreateRoadmap?: () => void;
+  requestStatus?: string;
   initialExpanded?: boolean;
 }
 
@@ -57,9 +58,11 @@ export default function CandidateProfileView({
   candidate,
   requestMessage,
   requestDate,
+  selectedSkills,
   onAccept,
   onReject,
   onMessage,
+  onCreateRoadmap,
   initialExpanded = false
 }: CandidateProfileViewProps) {
   const [isExpanded, setIsExpanded] = useState(initialExpanded);
@@ -130,68 +133,103 @@ export default function CandidateProfileView({
 
       <CardContent className="space-y-4">
         {/* Request Message */}
-        <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-          <h4 className="font-medium text-blue-900 mb-2 flex items-center">
-            <MessageCircle className="h-4 w-4 mr-2" />
-            Mentorship Request
-          </h4>
-          <p className="text-blue-800 leading-relaxed">{requestMessage}</p>
+        <div className="mb-4">
+          <h4 className="font-medium text-gray-900 mb-2">Request Message:</h4>
+          <p className="text-gray-700 text-sm bg-gray-50 p-3 rounded-lg">
+            {requestMessage}
+          </p>
         </div>
+
+        {/* Selected Skills */}
+        {selectedSkills && selectedSkills.length > 0 && (
+          <div className="mb-4">
+            <h4 className="font-medium text-gray-900 mb-2">Skills the candidate wants to learn:</h4>
+            <div className="flex flex-wrap gap-2">
+              {selectedSkills.map((skill, index) => (
+                <Badge key={index} variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                  {skill}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Basic Information */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-3">
-            <div className="flex items-center text-sm">
-              <Briefcase className="h-4 w-4 mr-2 text-gray-500" />
-              <span className="font-medium">Current Role:</span>
-              <span className="ml-2 text-gray-700">
-                {candidate.candidate_data?.currentRole || "Not specified"}
-              </span>
-            </div>
-            
-            <div className="flex items-center text-sm">
-              <Briefcase className="h-4 w-4 mr-2 text-gray-500" />
-              <span className="font-medium">Company:</span>
-              <span className="ml-2 text-gray-700">
-                {candidate.candidate_data?.company || "Not specified"}
-              </span>
-            </div>
-            
-            <div className="flex items-center text-sm">
-              <MapPin className="h-4 w-4 mr-2 text-gray-500" />
-              <span className="font-medium">Location:</span>
-              <span className="ml-2 text-gray-700">
-                {candidate.candidate_data?.location || "Not specified"}
-              </span>
-            </div>
-            
-            <div className="flex items-center text-sm">
-              <Clock className="h-4 w-4 mr-2 text-gray-500" />
-              <span className="font-medium">Experience:</span>
-              <span className="ml-2 text-gray-700">
-                {candidate.candidate_data?.experience || "Not specified"}
-              </span>
-            </div>
+          <div>
+            <Label className="text-sm font-medium text-gray-700">Full Name</Label>
+            <p className="text-sm text-gray-900">
+              {candidate.candidate_data?.fullName || "Not provided"}
+            </p>
           </div>
-          
-          <div className="space-y-3">
-            <div className="flex items-center text-sm">
-              <GraduationCap className="h-4 w-4 mr-2 text-gray-500" />
-              <span className="font-medium">Education:</span>
-              <span className="ml-2 text-gray-700">
-                {candidate.candidate_data?.education || "Not specified"}
-              </span>
-            </div>
-            
-            <div className="flex items-center text-sm">
-              <Globe className="h-4 w-4 mr-2 text-gray-500" />
-              <span className="font-medium">Timezone:</span>
-              <span className="ml-2 text-gray-700">
-                {candidate.candidate_data?.timezone || "Not specified"}
-              </span>
-            </div>
+          <div>
+            <Label className="text-sm font-medium text-gray-700">Current Role</Label>
+            <p className="text-sm text-gray-900">
+              {candidate.candidate_data?.currentRole || "Not provided"}
+            </p>
+          </div>
+          <div>
+            <Label className="text-sm font-medium text-gray-700">Company</Label>
+            <p className="text-sm text-gray-900">
+              {candidate.candidate_data?.company || "Not provided"}
+            </p>
+          </div>
+          <div>
+            <Label className="text-sm font-medium text-gray-700">Experience</Label>
+            <p className="text-sm text-gray-900">
+              {candidate.candidate_data?.experience || "Not provided"}
+            </p>
+          </div>
+          <div>
+            <Label className="text-sm font-medium text-gray-700">Education</Label>
+            <p className="text-sm text-gray-900">
+              {candidate.candidate_data?.education || "Not provided"}
+            </p>
+          </div>
+          <div>
+            <Label className="text-sm font-medium text-gray-700">Location</Label>
+            <p className="text-sm text-gray-900">
+              {candidate.candidate_data?.location || "Not provided"}
+            </p>
           </div>
         </div>
+
+        {/* Skills */}
+        {candidate.candidate_data?.skills && Array.isArray(candidate.candidate_data.skills) && candidate.candidate_data.skills.length > 0 && (
+          <div className="mb-4">
+            <Label className="text-sm font-medium text-gray-700 mb-2 block">Skills</Label>
+            <div className="flex flex-wrap gap-2">
+              {candidate.candidate_data.skills.map((skill, index) => (
+                <Badge key={index} variant="secondary">
+                  {skill}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Goals */}
+        {candidate.candidate_data?.goals && Array.isArray(candidate.candidate_data.goals) && candidate.candidate_data.goals.length > 0 && (
+          <div className="mb-4">
+            <Label className="text-sm font-medium text-gray-700 mb-2 block">Goals</Label>
+            <div className="space-y-2">
+              {candidate.candidate_data.goals.map((goal, index) => (
+                <div key={index} className="flex items-start gap-2">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                  <p className="text-sm text-gray-700">{goal}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Bio */}
+        {candidate.candidate_data?.bio && (
+          <div className="mb-4">
+            <Label className="text-sm font-medium text-gray-700 mb-2 block">Bio</Label>
+            <p className="text-sm text-gray-700">{candidate.candidate_data.bio}</p>
+          </div>
+        )}
 
         {/* Expanded Details */}
         {isExpanded && (
@@ -203,7 +241,7 @@ export default function CandidateProfileView({
                 Technical Skills
               </h4>
               <div className="flex flex-wrap gap-2">
-                {candidate.candidate_data?.skills && candidate.candidate_data.skills.length > 0 ? (
+                {candidate.candidate_data?.skills && Array.isArray(candidate.candidate_data.skills) && candidate.candidate_data.skills.length > 0 ? (
                   candidate.candidate_data.skills.map((skill, index) => (
                     <Badge key={index} variant="secondary" className="text-sm">
                       {skill}
@@ -216,121 +254,61 @@ export default function CandidateProfileView({
             </div>
 
             {/* Goals */}
-            <div>
-              <h4 className="font-medium text-gray-900 mb-2 flex items-center">
-                <Target className="h-4 w-4 mr-2" />
-                Mentorship Goals
-              </h4>
+            {candidate.candidate_data?.goals && Array.isArray(candidate.candidate_data.goals) && candidate.candidate_data.goals.length > 0 ? (
               <div className="flex flex-wrap gap-2">
-                {candidate.candidate_data?.goals && candidate.candidate_data.goals.length > 0 ? (
-                  candidate.candidate_data.goals.map((goal, index) => (
-                    <Badge key={index} variant="outline" className="text-sm">
-                      {goal}
-                    </Badge>
-                  ))
-                ) : (
-                  <span className="text-gray-500 text-sm">No goals specified</span>
-                )}
+                {candidate.candidate_data.goals.map((goal, index) => (
+                  <Badge key={index} variant="secondary">
+                    {goal}
+                  </Badge>
+                ))}
               </div>
-            </div>
-
-            {/* Preferred Mentorship Areas */}
-            {candidate.candidate_data?.preferredMentorshipAreas && candidate.candidate_data.preferredMentorshipAreas.length > 0 && (
-              <div>
-                <h4 className="font-medium text-gray-900 mb-2 flex items-center">
-                  <BookOpen className="h-4 w-4 mr-2" />
-                  Preferred Mentorship Areas
-                </h4>
-                <div className="flex flex-wrap gap-2">
-                  {candidate.candidate_data.preferredMentorshipAreas.map((area, index) => (
-                    <Badge key={index} variant="default" className="text-sm">
-                      {area}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
+            ) : (
+              <span className="text-gray-500 text-sm">No goals specified</span>
             )}
-
-            {/* Availability */}
-            {candidate.candidate_data?.availability && candidate.candidate_data.availability.length > 0 && (
-              <div>
-                <h4 className="font-medium text-gray-900 mb-2 flex items-center">
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Availability
-                </h4>
-                <div className="flex flex-wrap gap-2">
-                  {candidate.candidate_data.availability.map((slot, index) => (
-                    <Badge key={index} variant="outline" className="text-sm">
-                      {slot}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Bio */}
-            {candidate.candidate_data?.bio && (
-              <div>
-                <h4 className="font-medium text-gray-900 mb-2">About</h4>
-                <p className="text-gray-700 text-sm leading-relaxed">
-                  {candidate.candidate_data.bio}
-                </p>
-              </div>
-            )}
-
-            {/* Social Links */}
-            <div>
-              <h4 className="font-medium text-gray-900 mb-2">Professional Links</h4>
-              <div className="flex items-center space-x-3">
-                {candidate.candidate_data?.linkedinProfile && (
-                  <Button variant="outline" size="sm" asChild>
-                    <a href={candidate.candidate_data.linkedinProfile} target="_blank" rel="noopener noreferrer">
-                      <Linkedin className="h-4 w-4 mr-1" />
-                      LinkedIn
-                    </a>
-                  </Button>
-                )}
-                
-                {candidate.candidate_data?.githubProfile && (
-                  <Button variant="outline" size="sm" asChild>
-                    <a href={candidate.candidate_data.githubProfile} target="_blank" rel="noopener noreferrer">
-                      <Github className="h-4 w-4 mr-1" />
-                      GitHub
-                    </a>
-                  </Button>
-                )}
-                
-                {candidate.candidate_data?.portfolioUrl && (
-                  <Button variant="outline" size="sm" asChild>
-                    <a href={candidate.candidate_data.portfolioUrl} target="_blank" rel="noopener noreferrer">
-                      <Globe className="h-4 w-4 mr-1" />
-                      Portfolio
-                    </a>
-                  </Button>
-                )}
-              </div>
-            </div>
           </div>
         )}
 
         {/* Action Buttons */}
-        {onAccept && onReject && (
-          <div className="flex items-center justify-end space-x-3 pt-4 border-t">
+        <div className="flex items-center justify-end space-x-3 pt-4 border-t">
+          {onAccept && onReject && (
+            <>
+              <Button
+                variant="outline"
+                onClick={onReject}
+                className="border-red-300 text-red-700 hover:bg-red-50"
+              >
+                Reject Request
+              </Button>
+              <Button
+                onClick={onAccept}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                Accept Request
+              </Button>
+            </>
+          )}
+          
+          {onCreateRoadmap && (
+            <Button
+              onClick={onCreateRoadmap}
+              className="btn-gradient"
+            >
+              <BookOpen className="h-4 w-4 mr-2" />
+              Create Learning Roadmap
+            </Button>
+          )}
+          
+          {onMessage && (
             <Button
               variant="outline"
-              onClick={onReject}
-              className="border-red-300 text-red-700 hover:bg-red-50"
+              onClick={onMessage}
+              className="border-blue-300 text-blue-700 hover:bg-blue-50"
             >
-              Reject Request
+              <MessageCircle className="h-4 w-4 mr-2" />
+              Send Message
             </Button>
-            <Button
-              onClick={onAccept}
-              className="bg-green-600 hover:bg-green-700"
-            >
-              Accept Request
-            </Button>
-          </div>
-        )}
+          )}
+        </div>
       </CardContent>
     </Card>
   );

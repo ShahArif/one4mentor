@@ -16,6 +16,7 @@ export default function CandidateOnlyRoute({
   const [isCandidate, setIsCandidate] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
+  const [onboardingStatus, setOnboardingStatus] = useState<string | null>(null);
   const location = useLocation();
 
   useEffect(() => {
@@ -63,6 +64,25 @@ export default function CandidateOnlyRoute({
         const hasCandidateRole = roles?.some(role => role.role === "candidate");
         console.log("🔍 CandidateOnlyRoute: User roles:", roles?.map(r => r.role), "Has candidate role:", hasCandidateRole);
         setIsCandidate(hasCandidateRole);
+
+        // If user has candidate role, check onboarding status
+        if (hasCandidateRole) {
+          try {
+            const { data: candidateRequest } = await supabase
+              .from("candidate_onboarding_requests")
+              .select("status")
+              .eq("user_id", user.id)
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .single();
+
+            setOnboardingStatus(candidateRequest?.status || null);
+          } catch (error) {
+            console.log("No candidate onboarding request found");
+            setOnboardingStatus(null);
+          }
+        }
+
         setAuthChecked(true);
 
       } catch (error) {
@@ -96,12 +116,24 @@ export default function CandidateOnlyRoute({
     return <Navigate to={fallbackPath} state={{ from: location }} replace />;
   }
 
-  // If not a candidate, redirect to appropriate dashboard
+  // If user has candidate role but onboarding is pending, redirect to pending approval
+  if (isCandidate && onboardingStatus === "pending") {
+    console.log("🚫 Access denied: Candidate onboarding pending");
+    return <Navigate to="/onboarding/pending-approval" replace />;
+  }
+
+  // If user has candidate role and onboarding is approved or no onboarding request, allow access
+  if (isCandidate && (onboardingStatus === "approved" || onboardingStatus === null)) {
+    console.log("✅ Access granted: User is a candidate with approved onboarding");
+    return <>{children}</>;
+  }
+
+  // If not a candidate, redirect to appropriate dashboard or onboarding
   if (!isCandidate) {
     console.log("🚫 Access denied: User is not a candidate");
     
-    // Determine where to redirect based on user role
-    const getRedirectPath = async () => {
+    // Check if user has other roles
+    const checkOtherRoles = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
@@ -119,17 +151,17 @@ export default function CandidateOnlyRoute({
             }
           }
         }
-        return "/onboarding/pending-approval";
+        return "/onboarding/candidate";
       } catch (error) {
-        return "/onboarding/pending-approval";
+        return "/onboarding/candidate";
       }
     };
 
-    // For now, redirect to pending approval, but you could make this async
-    return <Navigate to="/onboarding/pending-approval" replace />;
+    // Redirect to appropriate onboarding or dashboard
+    return <Navigate to="/onboarding/candidate" replace />;
   }
 
-  // If user is a candidate, allow access
-  console.log("✅ Access granted: User is a candidate");
-  return <>{children}</>;
+  // Default fallback - should not reach here
+  console.log("🚫 Access denied: Default fallback");
+  return <Navigate to="/onboarding/candidate" replace />;
 }

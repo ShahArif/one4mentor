@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
+import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 import { 
   Search, 
   Filter, 
@@ -22,7 +23,9 @@ import {
   Users,
   Loader2,
   Database,
-  UserPlus
+  UserPlus,
+  Home,
+  User
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -63,6 +66,7 @@ export default function MentorSearch() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [bookmarkedMentors, setBookmarkedMentors] = useState<Set<string>>(new Set());
+  const [showBackToTop, setShowBackToTop] = useState(false);
 
   // Check authentication and user role
   useEffect(() => {
@@ -124,6 +128,16 @@ export default function MentorSearch() {
 
     checkAuth();
   }, [navigate, toast]);
+
+  // Handle scroll for back to top button
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowBackToTop(window.scrollY > 300);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   // Fetch mentors from Supabase
   const mentorsQuery = useQuery({
@@ -252,6 +266,33 @@ export default function MentorSearch() {
   return (
     <div className="min-h-screen bg-gradient-hero">
       <div className="container py-8">
+        {/* Breadcrumbs */}
+        <Breadcrumbs />
+        
+        {/* Quick Navigation */}
+        <div className="mb-6">
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline" size="sm">
+              <Link to="/">
+                <Users className="h-4 w-4 mr-2" />
+                Home
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link to="/candidate/dashboard">
+                <Briefcase className="h-4 w-4 mr-2" />
+                Dashboard
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link to="/candidate/requests">
+                <MessageCircle className="h-4 w-4 mr-2" />
+                My Requests
+              </Link>
+            </Button>
+          </div>
+        </div>
+        
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center mb-4">
@@ -271,27 +312,7 @@ export default function MentorSearch() {
             </div>
           </div>
 
-          {/* INFO SECTION */}
-          <Card className="mb-6 border-blue-200 bg-blue-50">
-            <CardHeader>
-              <CardTitle className="text-blue-800 flex items-center">
-                <Database className="h-4 w-4 mr-2" />
-                Browse Mentors
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-blue-800 text-sm">
-                🌟 <strong>Open Access:</strong> Anyone can browse and view mentor profiles. 
-                Log in and complete candidate onboarding to unlock booking features.
-              </p>
-              <div className="mt-3 text-xs text-blue-600">
-                {userRole 
-                  ? `Welcome! You have ${userRole} access with full platform features.`
-                  : "Sign up or log in to book sessions and contact mentors directly."
-                }
-              </div>
-            </CardContent>
-          </Card>
+
           
           {/* Search and Filter Bar */}
           <div className="flex flex-col sm:flex-row gap-4">
@@ -530,6 +551,70 @@ export default function MentorSearch() {
             )}
           </div>
         </div>
+        
+        {/* Floating Navigation Menu */}
+        <div className="fixed bottom-6 right-6 z-50">
+          <div className="bg-white rounded-lg shadow-lg border p-2">
+            <div className="flex flex-col gap-2">
+              <Button
+                asChild
+                size="sm"
+                variant="outline"
+                className="w-10 h-10 p-0"
+                title="Go Home"
+              >
+                <Link to="/">
+                  <Home className="h-4 w-4" />
+                </Link>
+              </Button>
+              <Button
+                asChild
+                size="sm"
+                variant="outline"
+                className="w-10 h-10 p-0"
+                title="Go to Dashboard"
+              >
+                <Link to="/candidate/dashboard">
+                  <Briefcase className="h-4 w-4" />
+                </Link>
+              </Button>
+              <Button
+                asChild
+                size="sm"
+                variant="outline"
+                className="w-10 h-10 p-0"
+                title="My Requests"
+              >
+                <Link to="/candidate/requests">
+                  <MessageCircle className="h-4 w-4" />
+                </Link>
+              </Button>
+              <Button
+                asChild
+                size="sm"
+                variant="outline"
+                className="w-10 h-10 p-0"
+                title="My Profile"
+              >
+                <Link to="/profile/edit">
+                  <User className="h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+        
+        {/* Back to Top Button */}
+        {showBackToTop && (
+          <Button
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            className="fixed bottom-6 left-6 z-50 w-10 h-10 p-0 rounded-full shadow-lg transition-all duration-300"
+            variant="outline"
+            title="Back to Top"
+          >
+            <ArrowLeft className="h-4 w-4 rotate-90" />
+          </Button>
+        )}
       </div>
     </div>
   );
