@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
 
@@ -15,39 +15,62 @@ export function ProtectedRoute({
   requiredRole, 
   fallbackPath = "/auth/login" 
 }: ProtectedRouteProps) {
-  const { user, loading } = useAuth();
+  const { user, roles, loading } = useAuth();
   const location = useLocation();
-  const [userRole, setUserRole] = useState<string | null>(null);
-  const [roleLoading, setRoleLoading] = useState(true);
+  const [onboardingStatus, setOnboardingStatus] = useState<{
+    status: string | null;
+    isLoading: boolean;
+  }>({ status: null, isLoading: true });
 
   useEffect(() => {
-    const getUserRole = async () => {
-      if (!user) {
-        setRoleLoading(false);
+    const checkOnboardingStatus = async () => {
+      if (!user || roles.length === 0) {
+        setOnboardingStatus({ status: null, isLoading: false });
         return;
       }
 
       try {
-        const { data: roles, error } = await supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", user.id);
+        // Check onboarding status for candidates
+        if (roles.includes("candidate")) {
+          const { data: candidateRequest } = await supabase
+            .from("candidate_onboarding_requests")
+            .select("status")
+            .eq("user_id", user.id)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .single();
 
-        if (!error && roles && roles.length > 0) {
-          setUserRole(roles[0].role);
+          setOnboardingStatus({
+            status: candidateRequest?.status || null,
+            isLoading: false
+          });
+        } else if (roles.includes("mentor")) {
+          const { data: mentorRequest } = await supabase
+            .from("mentor_onboarding_requests")
+            .select("status")
+            .eq("user_id", user.id)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .single();
+
+          setOnboardingStatus({
+            status: mentorRequest?.status || null,
+            isLoading: false
+          });
+        } else {
+          setOnboardingStatus({ status: null, isLoading: false });
         }
       } catch (error) {
-        console.error("Error fetching user role:", error);
-      } finally {
-        setRoleLoading(false);
+        console.error("Error fetching onboarding status:", error);
+        setOnboardingStatus({ status: null, isLoading: false });
       }
     };
 
-    getUserRole();
-  }, [user]);
+    checkOnboardingStatus();
+  }, [user, roles]);
 
-  // Show loading while checking authentication and role
-  if (loading || roleLoading) {
+  // Show loading while checking authentication and onboarding status
+  if (loading || onboardingStatus.isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -64,18 +87,34 @@ export function ProtectedRoute({
   }
 
   // Check role if required
-  if (requiredRole && userRole !== requiredRole) {
+  if (requiredRole && !roles.includes(requiredRole)) {
     // Redirect based on user's actual role
-    if (userRole === "candidate") {
+    if (roles.includes("candidate")) {
       return <Navigate to="/candidate/dashboard" replace />;
-    } else if (userRole === "mentor") {
+    } else if (roles.includes("mentor")) {
       return <Navigate to="/mentor/dashboard" replace />;
-    } else if (userRole === "admin" || userRole === "super_admin") {
+    } else if (roles.includes("admin") || roles.includes("super_admin")) {
       return <Navigate to="/admin/dashboard" replace />;
     } else {
-      // No role assigned, redirect to pending approval
-      return <Navigate to="/onboarding/pending-approval" replace />;
+      // No role assigned - check if they have a pending onboarding request
+      if (onboardingStatus.status === "pending") {
+        return <Navigate to="/onboarding/pending-approval" replace />;
+      } else if (onboardingStatus.status === "rejected") {
+        return <Navigate to="/onboarding/rejected" replace />;
+      } else {
+        // No role and no onboarding request - redirect to appropriate onboarding
+        return <Navigate to="/onboarding/candidate" replace />;
+      }
     }
+  }
+
+  // If user has the required role, check if they need to complete onboarding
+  if (roles.includes("candidate") && onboardingStatus.status === "pending") {
+    return <Navigate to="/onboarding/pending-approval" replace />;
+  }
+
+  if (roles.includes("mentor") && onboardingStatus.status === "pending") {
+    return <Navigate to="/onboarding/pending-approval" replace />;
   }
 
   return <>{children}</>;

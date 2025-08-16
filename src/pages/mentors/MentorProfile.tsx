@@ -1,15 +1,16 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Calendar, Clock, MapPin, Star, MessageCircle, BookOpen, DollarSign, Users, Award } from "lucide-react";
+import { Calendar, Clock, MapPin, Star, MessageCircle, BookOpen, DollarSign, Users, Award, ArrowLeft, Briefcase, Home, User } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 
 interface MentorProfile {
   id: string;
@@ -35,6 +36,7 @@ export default function MentorProfile() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [requestMessage, setRequestMessage] = useState("");
+  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showRequestModal, setShowRequestModal] = useState(false);
 
@@ -125,6 +127,15 @@ export default function MentorProfile() {
       return;
     }
 
+    if (selectedSkills.length === 0) {
+      toast({
+        title: "Skills Required",
+        description: "Please select at least one skill you'd like to learn from this mentor.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       
@@ -148,14 +159,15 @@ export default function MentorProfile() {
         return;
       }
 
-      // Create mentorship request
+      // Create mentorship request with selected skills
       const { error } = await supabase
         .from("mentorship_requests")
         .insert({
           candidate_id: user.id,
           mentor_id: mentor.id,
           message: requestMessage.trim(),
-          status: "pending"
+          status: "pending",
+          selected_skills: selectedSkills // Add selected skills to the request
         });
 
       if (error) throw error;
@@ -167,6 +179,7 @@ export default function MentorProfile() {
 
       setShowRequestModal(false);
       setRequestMessage("");
+      setSelectedSkills([]);
       
     } catch (error: any) {
       console.error("Error sending request:", error);
@@ -178,6 +191,14 @@ export default function MentorProfile() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const toggleSkill = (skill: string) => {
+    setSelectedSkills(prev => 
+      prev.includes(skill) 
+        ? prev.filter(s => s !== skill)
+        : [...prev, skill]
+    );
   };
 
   if (isLoading) {
@@ -208,14 +229,42 @@ export default function MentorProfile() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="container max-w-4xl mx-auto px-4">
-        {/* Back Button */}
-        <Button 
-          variant="ghost" 
-          onClick={() => navigate("/mentors")}
-          className="mb-6"
-        >
-          ← Back to Mentors
-        </Button>
+        {/* Breadcrumbs */}
+        <Breadcrumbs />
+        
+        {/* Navigation Bar */}
+        <div className="mb-6">
+          <div className="flex flex-wrap gap-2 mb-4">
+            <Button asChild variant="outline" size="sm">
+              <Link to="/">
+                <Home className="h-4 w-4 mr-2" />
+                Home
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link to="/mentors">
+                <Users className="h-4 w-4 mr-2" />
+                Find Mentors
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link to="/candidate/dashboard">
+                <Briefcase className="h-4 w-4 mr-2" />
+                Dashboard
+              </Link>
+            </Button>
+          </div>
+          
+          {/* Back Button */}
+          <Button 
+            variant="ghost" 
+            onClick={() => navigate("/mentors")}
+            className="mb-6"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Mentors
+          </Button>
+        </div>
 
         {/* Mentor Profile Card */}
         <Card className="shadow-xl">
@@ -251,6 +300,45 @@ export default function MentorProfile() {
                       <DialogTitle>Request Mentorship from {mentor.fullName}</DialogTitle>
                     </DialogHeader>
                     <div className="space-y-4">
+                      {/* Skills Selection */}
+                      <div>
+                        <Label>Select skills you'd like to learn (required)</Label>
+                        <div className="mt-2 p-3 border rounded-lg bg-gray-50">
+                          <p className="text-sm text-gray-600 mb-2">
+                            Click on skills to select/deselect them:
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {mentor.skills?.map((skill, index) => (
+                              <Badge
+                                key={index}
+                                variant={selectedSkills.includes(skill) ? "default" : "outline"}
+                                className={`cursor-pointer transition-colors ${
+                                  selectedSkills.includes(skill) 
+                                    ? "bg-blue-600 hover:bg-blue-700" 
+                                    : "hover:bg-gray-200"
+                                }`}
+                                onClick={() => toggleSkill(skill)}
+                              >
+                                {skill}
+                                {selectedSkills.includes(skill) && (
+                                  <span className="ml-1">✓</span>
+                                )}
+                              </Badge>
+                            ))}
+                          </div>
+                          {selectedSkills.length === 0 && (
+                            <p className="text-sm text-red-500 mt-2">
+                              Please select at least one skill
+                            </p>
+                          )}
+                          {selectedSkills.length > 0 && (
+                            <p className="text-sm text-green-600 mt-2">
+                              Selected: {selectedSkills.join(", ")}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
                       <div>
                         <Label htmlFor="message">Why would you like mentorship?</Label>
                         <Textarea
@@ -264,13 +352,17 @@ export default function MentorProfile() {
                       <div className="flex justify-end space-x-2">
                         <Button 
                           variant="outline" 
-                          onClick={() => setShowRequestModal(false)}
+                          onClick={() => {
+                            setShowRequestModal(false);
+                            setRequestMessage("");
+                            setSelectedSkills([]);
+                          }}
                         >
                           Cancel
                         </Button>
                         <Button 
                           onClick={handleRequestMentorship}
-                          disabled={isSubmitting || !requestMessage.trim()}
+                          disabled={isSubmitting || !requestMessage.trim() || selectedSkills.length === 0}
                         >
                           {isSubmitting ? "Sending..." : "Send Request"}
                         </Button>
@@ -311,11 +403,27 @@ export default function MentorProfile() {
                 <h3 className="text-xl font-semibold mb-3">Skills & Expertise</h3>
                 <div className="flex flex-wrap gap-2">
                   {mentor.skills.map((skill, index) => (
-                    <Badge key={index} variant="secondary" className="text-sm">
+                    <Badge 
+                      key={index} 
+                      variant={selectedSkills.includes(skill) ? "default" : "secondary"} 
+                      className={`text-sm ${
+                        showRequestModal && selectedSkills.includes(skill) 
+                          ? "ring-2 ring-blue-400 ring-offset-2" 
+                          : ""
+                      }`}
+                    >
                       {skill}
+                      {showRequestModal && selectedSkills.includes(skill) && (
+                        <span className="ml-1">✓</span>
+                      )}
                     </Badge>
                   ))}
                 </div>
+                {showRequestModal && selectedSkills.length > 0 && (
+                  <p className="text-sm text-blue-600 mt-2">
+                    Selected skills: {selectedSkills.join(", ")}
+                  </p>
+                )}
               </div>
             )}
 
@@ -364,6 +472,68 @@ export default function MentorProfile() {
             </div>
           </CardContent>
         </Card>
+        
+        {/* Floating Navigation Menu */}
+        <div className="fixed bottom-6 right-6 z-50">
+          <div className="bg-white rounded-lg shadow-lg border p-2">
+            <div className="flex flex-col gap-2">
+              <Button
+                asChild
+                size="sm"
+                variant="outline"
+                className="w-10 h-10 p-0"
+                title="Go Home"
+              >
+                <Link to="/">
+                  <Home className="h-4 w-4" />
+                </Link>
+              </Button>
+              <Button
+                asChild
+                size="sm"
+                variant="outline"
+                className="w-10 h-10 p-0"
+                title="Find More Mentors"
+              >
+                <Link to="/mentors">
+                  <Users className="h-4 w-4" />
+                </Link>
+              </Button>
+              <Button
+                asChild
+                size="sm"
+                variant="outline"
+                className="w-10 h-10 p-0"
+                title="Go to Dashboard"
+              >
+                <Link to="/candidate/dashboard">
+                  <Briefcase className="h-4 w-4" />
+                </Link>
+              </Button>
+              <Button
+                asChild
+                size="sm"
+                variant="outline"
+                className="w-10 h-10 p-0"
+                title="My Profile"
+              >
+                <Link to="/profile/edit">
+                  <User className="h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+        
+        {/* Back to Top Button */}
+        <Button
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          className="fixed bottom-6 left-6 z-50 w-10 h-10 p-0 rounded-full shadow-lg"
+          variant="outline"
+          title="Back to Top"
+        >
+          <ArrowLeft className="h-4 w-4 rotate-90" />
+        </Button>
       </div>
     </div>
   );

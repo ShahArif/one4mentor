@@ -5,6 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { 
   Calendar, 
   MessageCircle, 
   BookOpen, 
@@ -19,11 +26,15 @@ import {
   CheckCircle,
   User,
   Search,
-  Loader2
+  Loader2,
+  ExternalLink,
+  ChevronRight
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useLogout } from "@/hooks/use-logout";
 import { useToast } from "@/hooks/use-toast";
+import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
+import { CandidateLayout } from "@/components/layout/CandidateLayout";
 
 interface MentorshipRequest {
   id: string;
@@ -31,6 +42,7 @@ interface MentorshipRequest {
   message: string;
   status: "pending" | "accepted" | "rejected" | "cancelled";
   created_at: string;
+  selected_skills?: string[];
   mentor: {
     fullName: string;
     currentRole?: string;
@@ -215,6 +227,7 @@ export default function CandidateDashboard() {
                 message: req.message,
                 status: req.status,
                 created_at: req.created_at,
+                selected_skills: req.selected_skills,
                 mentor: {
                   fullName: mentorData?.data?.fullName || "Unknown Mentor",
                   currentRole: mentorData?.data?.currentRole,
@@ -230,6 +243,7 @@ export default function CandidateDashboard() {
                 message: req.message,
                 status: req.status,
                 created_at: req.created_at,
+                selected_skills: req.selected_skills,
                 mentor: {
                   fullName: "Unknown Mentor",
                   currentRole: "Unknown",
@@ -256,131 +270,145 @@ export default function CandidateDashboard() {
         }));
       }
 
+      // TODO: Uncomment when sessions table is created
       // Fetch real sessions data
-      const { data: sessions, error: sessionsError } = await supabase
-        .from("sessions")
-        .select("*")
-        .eq("candidate_id", userId)
-        .order("scheduled_date", { ascending: true });
+      // const { data: sessions, error: sessionsError } = await supabase
+      //   .from("sessions")
+      //   .select("*")
+      //   .eq("candidate_id", userId)
+      //   .order("scheduled_date", { ascending: true });
 
-      if (sessionsError) {
-        console.error("Error fetching sessions:", sessionsError);
-        setUpcomingSessions([]);
-      } else {
-        // Fetch mentor details for each session separately
-        const sessionsWithMentorDetails = await Promise.all(
-          (sessions || []).map(async (session) => {
-            try {
-              const { data: mentorData, error: mentorError } = await supabase
-                .from("mentor_onboarding_requests")
-                .select("data")
-                .eq("user_id", session.mentor_id)
-                .eq("status", "approved")
-                .single();
+      // if (sessionsError) {
+      //   console.error("Error fetching sessions:", sessionsError);
+      //   setUpcomingSessions([]);
+      // } else {
+      //   // Fetch mentor details for each session separately
+      //   const sessionsWithMentorDetails = await Promise.all(
+      //     (sessions || []).map(async (session) => {
+      //       try {
+      //         const { data: mentorData, error: mentorError } = await supabase
+      //           .from("mentor_onboarding_requests")
+      //           .select("data")
+      //           .eq("user_id", session.mentor_id)
+      //           .eq("status", "approved")
+      //           .single();
 
-              if (mentorError) {
-                console.error("Error fetching mentor data for session:", mentorError);
-              }
+      //         if (mentorError) {
+      //         console.error("Error fetching mentor data for session:", mentorError);
+      //         }
 
-              return {
-                id: session.id,
-                mentor_name: mentorData?.data?.fullName || "Unknown Mentor",
-                type: session.session_type,
-                date: new Date(session.scheduled_date).toLocaleDateString("en-US", {
-                  weekday: "long",
-                  month: "short",
-                  day: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit"
-                }),
-                duration: `${session.duration_minutes} mins`,
-                status: session.status
-              };
-            } catch (error) {
-              console.error(`Error fetching mentor details for session ${session.id}:`, error);
-              return {
-                id: session.id,
-                mentor_name: "Unknown Mentor",
-                type: session.session_type,
-                date: new Date(session.scheduled_date).toLocaleDateString("en-US", {
-                  weekday: "long",
-                  month: "short",
-                  day: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit"
-                }),
-                duration: `${session.duration_minutes} mins`,
-                status: session.status
-              };
-            }
-          })
-        );
+      //         return {
+      //           id: session.id,
+      //           mentor_name: mentorData?.data?.fullName || "Unknown Mentor",
+      //           type: session.session_type,
+      //           date: new Date(session.scheduled_date).toLocaleDateString("en-US", {
+      //             weekday: "long",
+      //             month: "short",
+      //             day: "numeric",
+      //             hour: "2-digit",
+      //             minute: "2-digit"
+      //           }),
+      //           duration: `${session.duration_minutes} mins`,
+      //           status: session.status
+      //         };
+      //       } catch (error) {
+      //         console.error(`Error fetching mentor details for session ${session.id}:`, error);
+      //         return {
+      //           id: session.id,
+      //           mentor_name: "Unknown Mentor",
+      //           type: session.session_type,
+      //           date: new Date(session.scheduled_date).toLocaleDateString("en-US", {
+      //             weekday: "long",
+      //             month: "short",
+      //             day: "numeric",
+      //             hour: "2-digit",
+      //             minute: "2-digit"
+      //           }),
+      //           duration: `${session.duration_minutes} mins`,
+      //           status: session.status
+      //         };
+      //       }
+      //     })
+      //   );
         
-        setUpcomingSessions(sessionsWithMentorDetails);
+      //   setUpcomingSessions(sessionsWithMentorDetails);
         
-        // Update stats with real session data
-        setStats(prev => ({
-          ...prev,
-          totalSessions: sessionsWithMentorDetails.length,
-          completedSessions: sessionsWithMentorDetails.filter(s => s.status === "completed").length
-        }));
-      }
+      //   // Update stats with real session data
+      //   setStats(prev => ({
+      //     ...prev,
+      //     totalSessions: sessionsWithMentorDetails.length,
+      //     completedSessions: sessionsWithMentorDetails.filter(s => s.status === "completed").length
+      //   }));
+      // }
 
+      // Temporary: Set empty sessions and update stats
+      setUpcomingSessions([]);
+      setStats(prev => ({
+        ...prev,
+        totalSessions: 0,
+        completedSessions: 0
+      }));
+
+      // TODO: Uncomment when session_feedback table is created
       // Fetch real feedback data
-      const { data: feedback, error: feedbackError } = await supabase
-        .from("session_feedback")
-        .select("*")
-        .eq("candidate_id", userId)
-        .order("created_at", { ascending: false })
-        .limit(5);
+      // const { data: feedback, error: feedbackError } = await supabase
+      //   .from("session_feedback")
+      //   .select("*")
+      //   .eq("candidate_id", userId)
+      //   .order("created_at", { ascending: false })
+      //   .limit(5);
 
-      if (feedbackError) {
-        console.error("Error fetching feedback:", feedbackError);
-        setRecentFeedback([]);
-      } else {
-        // Fetch mentor details for each feedback separately
-        const feedbackWithMentorDetails = await Promise.all(
-          (feedback || []).map(async (fb) => {
-            try {
-              const { data: mentorData, error: mentorError } = await supabase
-                .from("mentor_onboarding_requests")
-                .select("data")
-                .eq("user_id", fb.mentor_id)
-                .eq("status", "approved")
-                .single();
+      // TODO: Uncomment when session_feedback table is created
+      // if (feedbackError) {
+      //   console.error("Error fetching feedback:", feedbackError);
+      //   setRecentFeedback([]);
+      // } else {
+      //   // Fetch mentor details for each feedback separately
+      //   const feedbackWithMentorDetails = await Promise.all(
+      //     (feedback || []).map(async (fb) => {
+      //       try {
+      //         const { data: mentorData, error: mentorError } = await supabase
+      //           .from("mentor_onboarding_requests")
+      //           .select("data")
+      //           .eq("user_id", fb.mentor_id)
+      //           .eq("status", "approved")
+      //           .single();
 
-              if (mentorError) {
-                console.error("Error fetching mentor data for feedback:", mentorError);
-              }
+      //         if (mentorError) {
+      //         console.error("Error fetching mentor data for feedback:", mentorError);
+      //         }
 
-              return {
-                id: fb.id,
-                mentor_name: mentorData?.data?.fullName || "Unknown Mentor",
-                rating: fb.rating,
-                feedback: fb.feedback || "No feedback provided",
-                date: new Date(fb.created_at).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric"
-                })
-              };
-            } catch (error) {
-              console.error(`Error fetching mentor details for feedback ${fb.id}:`, error);
-              return {
-                id: fb.id,
-                mentor_name: "Unknown Mentor",
-                rating: fb.rating,
-                feedback: fb.feedback || "No feedback provided",
-                date: new Date(fb.created_at).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric"
-                })
-              };
-            }
-          })
-        );
+      //         return {
+      //           id: fb.id,
+      //           mentor_name: mentorData?.data?.fullName || "Unknown Mentor",
+      //           rating: fb.rating,
+      //           feedback: fb.feedback || "No feedback provided",
+      //           date: new Date(fb.created_at).toLocaleDateString("en-US", {
+      //             month: "short",
+      //             day: "numeric"
+      //           })
+      //         };
+      //       } catch (error) {
+      //         console.error(`Error fetching mentor details for feedback ${fb.id}:`, error);
+      //         return {
+      //           id: fb.id,
+      //           mentor_name: "Unknown Mentor",
+      //           rating: fb.rating,
+      //           feedback: fb.feedback || "No feedback provided",
+      //           date: new Date(fb.created_at).toLocaleDateString("en-US", {
+      //             month: "short",
+      //             day: "numeric"
+      //           })
+      //         };
+      //       }
+      //     })
+      //   );
         
-        setRecentFeedback(feedbackWithMentorDetails);
-      }
+      //   setRecentFeedback(feedbackWithMentorDetails);
+      // }
+
+      // Temporary: Set empty feedback
+      setRecentFeedback([]);
 
       // Fetch real learning progress data
       const { data: progress, error: progressError } = await supabase
@@ -484,100 +512,175 @@ export default function CandidateDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-hero">
-      {/* Header */}
-      <div className="bg-background border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between py-6">
+    <CandidateLayout>
+      <div className="w-full">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Candidate Dashboard</h1>
-              <p className="text-gray-600">Manage your mentorship journey</p>
+              <h1 className="text-3xl font-bold">Candidate Dashboard</h1>
+              <p className="text-muted-foreground mt-2">
+                Welcome back! Here's what's happening with your mentorship journey.
+              </p>
             </div>
-            <Button 
-              variant="outline" 
-              onClick={logout}
-              className="flex items-center gap-2"
-            >
-              <LogOut className="h-4 w-4" />
-              Sign Out
-            </Button>
+            <div className="flex gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline">
+                    <User className="h-4 w-4 mr-2" />
+                    My Profile
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem asChild>
+                    <Link to="/profile/edit">
+                      <User className="h-4 w-4 mr-2" />
+                      Edit Profile
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={logout}>
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Profile Completion Banner */}
-      {approvalStatus.needsProfileCompletion && (
-        <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mx-4 mt-4 rounded-r-lg">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <User className="h-5 w-5 text-blue-400 mr-3" />
-              <div>
-                <h3 className="text-sm font-medium text-blue-800">
-                  Complete Your Profile
-                </h3>
-                <p className="text-sm text-blue-700 mt-1">
-                  Add your skills, experience, and goals to get better mentor matches.
-                </p>
+        {/* Profile Completion Banner */}
+        {approvalStatus.needsProfileCompletion && (
+          <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded-r-lg mb-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <User className="h-5 w-5 text-blue-400 mr-3" />
+                <div>
+                  <h3 className="text-sm font-medium text-blue-800">
+                    Complete Your Profile
+                  </h3>
+                  <p className="text-sm text-blue-700 mt-1">
+                    Add your skills, experience, and goals to get better mentor matches.
+                  </p>
+                </div>
               </div>
+              <Button size="sm" onClick={() => navigate("/onboarding/candidate")}>
+                Complete Profile
+              </Button>
             </div>
-            <Button size="sm" onClick={() => navigate("/onboarding/candidate")}>
-              Complete Profile
-            </Button>
           </div>
-        </div>
-      )}
+        )}
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <MessageCircle className="h-8 w-8 text-primary mr-3" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Mentorship Requests</p>
-                  <p className="text-2xl font-bold">{stats.totalRequests}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <CheckCircle className="h-8 w-8 text-primary mr-3" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Accepted Requests</p>
-                  <p className="text-2xl font-bold">{stats.acceptedRequests}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <Calendar className="h-8 w-8 text-primary mr-3" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Sessions</p>
-                  <p className="text-2xl font-bold">{stats.totalSessions}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <Star className="h-8 w-8 text-primary mr-3" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Completed Sessions</p>
-                  <p className="text-2xl font-bold">{stats.completedSessions}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        {/* Breadcrumbs */}
+        <Breadcrumbs />
+        
+                 {/* Main Content */}
+         <div className="space-y-8">
+           {/* Quick Stats */}
+           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+             <Card>
+               <CardContent className="p-6">
+                 <div className="flex items-center">
+                   <MessageCircle className="h-8 w-8 text-blue-500 mr-3" />
+                   <div>
+                     <p className="text-sm text-gray-600">Mentorship Requests</p>
+                     <p className="text-2xl font-bold">{mentorshipRequests.length}</p>
+                   </div>
+                 </div>
+               </CardContent>
+             </Card>
+             
+             <Card>
+               <CardContent className="p-6">
+                 <div className="flex items-center">
+                   <BookOpen className="h-8 w-8 text-green-500 mr-3" />
+                   <div>
+                     <p className="text-sm text-gray-600">Learning Roadmaps</p>
+                     <p className="text-2xl font-bold">0</p>
+                   </div>
+                 </div>
+               </CardContent>
+             </Card>
+             
+             <Card>
+               <CardContent className="p-6">
+                 <div className="flex items-center">
+                   <Clock className="h-8 w-8 text-yellow-500 mr-3" />
+                   <div>
+                     <p className="text-sm text-gray-600">Pending Requests</p>
+                     <p className="text-2xl font-bold">{mentorshipRequests.filter(r => r.status === "pending").length}</p>
+                   </div>
+                 </div>
+               </CardContent>
+             </Card>
+           </div>
+
+           {/* Important Action Cards */}
+           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+             <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+               <Link to="/candidate/requests" className="block">
+                 <CardContent className="p-6">
+                   <div className="flex items-center justify-between">
+                     <div className="flex items-center">
+                       <Users className="h-8 w-8 text-indigo-500 mr-3" />
+                       <div>
+                         <p className="text-sm font-medium text-gray-900">Active Mentorships</p>
+                         <p className="text-2xl font-bold text-indigo-600">
+                           {mentorshipRequests.filter(r => r.status === "accepted").length}
+                         </p>
+                         <p className="text-xs text-gray-500 mt-1">View all requests</p>
+                       </div>
+                     </div>
+                     <div className="text-indigo-500">
+                       <ChevronRight className="h-5 w-5" />
+                     </div>
+                   </div>
+                 </CardContent>
+               </Link>
+             </Card>
+
+             <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+               <Link to="/candidate/roadmaps" className="block">
+                 <CardContent className="p-6">
+                   <div className="flex items-center justify-between">
+                     <div className="flex items-center">
+                       <Target className="h-8 w-8 text-emerald-500 mr-3" />
+                       <div>
+                         <p className="text-sm font-medium text-gray-900">Learning Goals</p>
+                         <p className="text-2xl font-bold text-emerald-600">3</p>
+                         <p className="text-xs text-gray-500 mt-1">Track progress</p>
+                       </div>
+                     </div>
+                     <div className="text-emerald-500">
+                       <ChevronRight className="h-5 w-5" />
+                     </div>
+                   </div>
+                 </CardContent>
+               </Link>
+             </Card>
+
+             <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+               <Link to="/sessions" className="block">
+                 <CardContent className="p-6">
+                   <div className="flex items-center justify-between">
+                     <div className="flex items-center">
+                       <Calendar className="h-8 w-8 text-purple-500 mr-3" />
+                       <div>
+                         <p className="text-sm font-medium text-gray-900">Upcoming Sessions</p>
+                         <p className="text-2xl font-bold text-purple-600">
+                           {upcomingSessions.length}
+                         </p>
+                         <p className="text-xs text-gray-500 mt-1">Schedule & manage</p>
+                       </div>
+                     </div>
+                     <div className="text-purple-500">
+                       <ChevronRight className="h-5 w-5" />
+                     </div>
+                   </div>
+                 </CardContent>
+               </Link>
+             </Card>
+           </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Left Column */}
@@ -661,146 +764,10 @@ export default function CandidateDashboard() {
             </Card>
           </div>
 
-          {/* Right Column */}
-          <div className="space-y-6">
-            {/* Recent Feedback */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Star className="h-5 w-5 mr-2" />
-                  Recent Feedback
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {isLoadingData ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin mr-2" />
-                    <span>Loading feedback...</span>
-                  </div>
-                ) : recentFeedback.length > 0 ? (
-                  recentFeedback.map((feedback) => (
-                    <div key={feedback.id} className="p-4 border rounded-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-semibold">{feedback.mentor_name}</h4>
-                        <div className="flex items-center">
-                          {[...Array(5)].map((_, i) => (
-                            <Star
-                              key={i}
-                              className={`h-4 w-4 ${
-                                i < feedback.rating
-                                  ? "text-yellow-400 fill-current"
-                                  : "text-gray-300"
-                              }`}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                      <p className="text-sm text-muted-foreground mb-2">{feedback.feedback}</p>
-                      <p className="text-xs text-muted-foreground">{feedback.date}</p>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-center py-6 text-muted-foreground">
-                    <Star className="h-8 w-8 mx-auto mb-2" />
-                    <p>No feedback received yet</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Recent Mentorship Requests */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <MessageCircle className="h-5 w-5 mr-2" />
-                  Recent Requests
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {isLoadingData ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin mr-2" />
-                    <span>Loading requests...</span>
-                  </div>
-                ) : mentorshipRequests.length > 0 ? (
-                  mentorshipRequests.slice(0, 3).map((request) => (
-                    <div key={request.id} className="p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                      <div className="flex items-center justify-between mb-3">
-                        <h4 className="font-semibold text-lg">{request.mentor.fullName}</h4>
-                        <Badge 
-                          variant={
-                            request.status === "accepted" ? "default" : 
-                            request.status === "rejected" ? "destructive" : 
-                            "secondary"
-                          }
-                        >
-                          {request.status}
-                        </Badge>
-                      </div>
-                      
-                      <div className="mb-3">
-                        <p className="text-sm text-muted-foreground mb-1">
-                          {request.mentor.currentRole && `${request.mentor.currentRole}`}
-                          {request.mentor.company && ` at ${request.mentor.company}`}
-                        </p>
-                        {request.mentor.expertise && (
-                          <p className="text-sm text-muted-foreground">
-                            Expertise: {request.mentor.expertise}
-                          </p>
-                        )}
-                      </div>
-                      
-                      {/* Request Message */}
-                      <div className="bg-blue-50 p-3 rounded-lg mb-3">
-                        <p className="text-sm font-medium text-blue-800 mb-1">Your Request Message:</p>
-                        <p className="text-sm text-blue-700">{request.message || "No message provided"}</p>
-                      </div>
-                      
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>Requested: {new Date(request.created_at).toLocaleDateString("en-US", {
-                          year: "numeric",
-                          month: "long",
-                          day: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit"
-                        })}</span>
-                        
-                        {request.status === "pending" && (
-                          <span className="text-yellow-600 font-medium">⏳ Waiting for response</span>
-                        )}
-                        {request.status === "accepted" && (
-                          <span className="text-green-600 font-medium">✅ Request accepted!</span>
-                        )}
-                        {request.status === "rejected" && (
-                          <span className="text-red-600 font-medium">❌ Request declined</span>
-                        )}
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-center py-6 text-muted-foreground">
-                    <MessageCircle className="h-8 w-8 mx-auto mb-2" />
-                    <p>No mentorship requests yet</p>
-                    <p className="text-sm mt-1">Start by finding mentors and sending requests!</p>
-                  </div>
-                )}
-                
-                {mentorshipRequests.length > 3 && (
-                  <Button asChild className="w-full" variant="outline">
-                    <Link to="/candidate/requests">View All Requests</Link>
-                  </Button>
-                )}
-                
-                {mentorshipRequests.length === 0 && (
-                  <Button asChild className="w-full" variant="default">
-                    <Link to="/mentors">Find Mentors</Link>
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+          
         </div>
       </div>
     </div>
-  );
+  </CandidateLayout>
+);
 }

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   MessageCircle, 
   Clock, 
@@ -11,13 +12,22 @@ import {
   Calendar,
   Filter,
   Search,
-  Bug
+  Bug,
+  ArrowLeft,
+  Home,
+  Briefcase,
+  Users,
+  Settings,
+  BookOpen
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import CandidateProfileView from "@/components/mentor/CandidateProfileView";
+import RoadmapDisplay from "@/components/mentor/RoadmapDisplay";
 import { debugMentorshipRequests, checkMentorshipRequestSchema, listAllMentorshipRequests } from "@/utils/debugMentorship";
 import { Input } from "@/components/ui/input";
+import { Link, useNavigate } from "react-router-dom";
+import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 
 interface MentorshipRequest {
   id: string;
@@ -26,6 +36,7 @@ interface MentorshipRequest {
   message: string;
   status: "pending" | "accepted" | "rejected" | "cancelled";
   created_at: string;
+  selected_skills?: string[];
   candidate: {
     id: string;
     email: string;
@@ -58,7 +69,9 @@ export default function MentorshipRequests() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [showBackToTop, setShowBackToTop] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchRequests();
@@ -67,6 +80,16 @@ export default function MentorshipRequests() {
   useEffect(() => {
     filterRequests();
   }, [requests, searchTerm, statusFilter]);
+
+  // Handle scroll for back to top button
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowBackToTop(window.scrollY > 300);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const fetchRequests = async () => {
     try {
@@ -92,6 +115,15 @@ export default function MentorshipRequests() {
       }
 
       console.log("Raw mentorship requests:", requests);
+
+      // Debug: Check if selected_skills exists in the raw data
+      requests?.forEach((req, index) => {
+        console.log(`Request ${index}:`, {
+          id: req.id,
+          selected_skills: req.selected_skills,
+          hasSelectedSkills: 'selected_skills' in req
+        });
+      });
 
       // Then, fetch candidate profiles and onboarding data for each request
       const requestsWithDetails = await Promise.all(
@@ -296,6 +328,48 @@ export default function MentorshipRequests() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="container max-w-6xl mx-auto px-4">
+        {/* Breadcrumbs */}
+        <Breadcrumbs />
+        
+        {/* Navigation */}
+        <div className="mb-6">
+          <div className="flex flex-wrap gap-2 mb-4">
+            <Button asChild variant="outline" size="sm">
+              <Link to="/">
+                <Home className="h-4 w-4 mr-2" />
+                Home
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link to="/mentor/dashboard">
+                <Briefcase className="h-4 w-4 mr-2" />
+                Dashboard
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link to="/mentors">
+                <Users className="h-4 w-4 mr-2" />
+                Find Mentors
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link to="/profile/edit">
+                <User className="h-4 w-4 mr-2" />
+                My Profile
+              </Link>
+            </Button>
+          </div>
+          
+          <Button 
+            variant="ghost" 
+            onClick={() => navigate(-1)}
+            className="mb-6"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
+        </div>
+
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">All Mentorship Requests</h1>
           <p className="text-gray-600 mt-2">
@@ -419,17 +493,139 @@ export default function MentorshipRequests() {
                   </p>
                 </div>
                 
-                <CandidateProfileView
-                  candidate={request.candidate}
-                  requestMessage={request.message}
-                  requestDate={request.created_at}
-                  onAccept={request.status === "pending" ? () => handleRequestAction(request.id, "accept") : undefined}
-                  onReject={request.status === "pending" ? () => handleRequestAction(request.id, "reject") : undefined}
-                  initialExpanded={false}
-                />
+                {/* Tabs for Profile and Roadmaps */}
+                <Tabs defaultValue="profile" className="w-full">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="profile" className="flex items-center gap-2">
+                      <User className="h-4 w-4" />
+                      Candidate Profile
+                    </TabsTrigger>
+                    <TabsTrigger value="roadmaps" className="flex items-center gap-2">
+                      <BookOpen className="h-4 w-4" />
+                      Learning Roadmaps
+                    </TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="profile" className="mt-4">
+                    <CandidateProfileView
+                      candidate={request.candidate}
+                      requestMessage={request.message}
+                      requestDate={request.created_at}
+                      selectedSkills={request.selected_skills}
+                      onAccept={request.status === "pending" ? () => handleRequestAction(request.id, "accept") : undefined}
+                      onReject={request.status === "pending" ? () => handleRequestAction(request.id, "reject") : undefined}
+                      onCreateRoadmap={request.status === "accepted" ? () => {
+                        // Switch to roadmaps tab when Create Roadmap is clicked
+                        const tabsList = document.querySelector('[data-value="roadmaps"]') as HTMLElement;
+                        if (tabsList) {
+                          tabsList.click();
+                        }
+                      } : undefined}
+                      requestStatus={request.status}
+                      initialExpanded={false}
+                    />
+                  </TabsContent>
+                  
+                  <TabsContent value="roadmaps" className="mt-4">
+                    {request.status === "accepted" ? (
+                      <RoadmapDisplay
+                        mentorshipRequestId={request.id}
+                        candidateId={request.candidate_id}
+                        selectedSkills={request.selected_skills || []}
+                      />
+                    ) : (
+                      <Card className="w-full">
+                        <CardContent className="p-8">
+                          <div className="text-center">
+                            <BookOpen className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                              Roadmaps Available After Acceptance
+                            </h3>
+                            <p className="text-gray-600 mb-4">
+                              You can create learning roadmaps for this candidate once you accept their mentorship request.
+                            </p>
+                            {request.status === "pending" && (
+                              <Button 
+                                onClick={() => handleRequestAction(request.id, "accept")}
+                                className="btn-gradient"
+                              >
+                                <CheckCircle className="h-4 w-4 mr-2" />
+                                Accept Request to Create Roadmap
+                              </Button>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </TabsContent>
+                </Tabs>
               </div>
             ))}
           </div>
+        )}
+        
+        {/* Floating Navigation Menu */}
+        <div className="fixed bottom-6 right-6 z-50">
+          <div className="bg-white rounded-lg shadow-lg border p-2">
+            <div className="flex flex-col gap-2">
+              <Button
+                asChild
+                size="sm"
+                variant="outline"
+                className="w-10 h-10 p-0"
+                title="Go Home"
+              >
+                <Link to="/">
+                  <Home className="h-4 w-4" />
+                </Link>
+              </Button>
+              <Button
+                asChild
+                size="sm"
+                variant="outline"
+                className="w-10 h-10 p-0"
+                title="Go to Dashboard"
+              >
+                <Link to="/mentor/dashboard">
+                  <Briefcase className="h-4 w-4" />
+                </Link>
+              </Button>
+              <Button
+                asChild
+                size="sm"
+                variant="outline"
+                className="w-10 h-10 p-0"
+                title="Find Mentors"
+              >
+                <Link to="/mentors">
+                  <Users className="h-4 w-4" />
+                </Link>
+              </Button>
+              <Button
+                asChild
+                size="sm"
+                variant="outline"
+                className="w-10 h-10 p-0"
+                title="My Profile"
+              >
+                <Link to="/profile/edit">
+                  <User className="h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+        
+        {/* Back to Top Button */}
+        {showBackToTop && (
+          <Button
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            className="fixed bottom-6 left-6 z-50 w-10 h-10 p-0 rounded-full shadow-lg transition-all duration-300"
+            variant="outline"
+            title="Back to Top"
+          >
+            <ArrowLeft className="h-4 w-4 rotate-90" />
+          </Button>
         )}
       </div>
     </div>

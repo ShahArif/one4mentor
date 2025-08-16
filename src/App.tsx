@@ -32,6 +32,11 @@ import AdminLogin from "./pages/admin/AdminLogin";
 import RoleRedirect from "./pages/dashboard/RoleRedirect";
 import MentorshipRequests from "./pages/mentors/MentorshipRequests";
 import CandidateRequests from "./pages/candidate/CandidateRequests";
+import NavigationHelp from "./pages/NavigationHelp";
+import ProfileEdit from "./pages/profile/ProfileEdit";
+import CandidateRoadmaps from "./pages/candidate/CandidateRoadmaps";
+import MentorCandidates from "./pages/mentors/MentorCandidates";
+import MentorCandidateRoadmaps from "./pages/mentors/CandidateRoadmaps";
 
 const queryClient = new QueryClient();
 
@@ -77,6 +82,11 @@ const App = () => (
                 <CandidateRequests />
               </ProtectedRoute>
             } />
+            <Route path="/candidate/roadmaps" element={
+              <ProtectedRoute requiredRole="candidate">
+                <CandidateRoadmaps />
+              </ProtectedRoute>
+            } />
             <Route path="/mentor/dashboard" element={
               <ProtectedRoute requiredRole="mentor">
                 <MentorDashboard />
@@ -85,6 +95,16 @@ const App = () => (
             <Route path="/mentor/requests" element={
               <ProtectedRoute requiredRole="mentor">
                 <MentorshipRequests />
+              </ProtectedRoute>
+            } />
+            <Route path="/mentor/candidates" element={
+              <ProtectedRoute requiredRole="mentor">
+                <MentorCandidates />
+              </ProtectedRoute>
+            } />
+            <Route path="/mentor/candidates/:candidateId/roadmaps" element={
+              <ProtectedRoute requiredRole="mentor">
+                <MentorCandidateRoadmaps />
               </ProtectedRoute>
             } />
             <Route path="/booking/:id" element={
@@ -149,6 +169,11 @@ const App = () => (
                 <AnalyticsDashboard />
               </ProtectedRoute>
             } />
+            <Route path="/profile/edit" element={
+              <ProtectedRoute>
+                <ProfileEdit />
+              </ProtectedRoute>
+            } />
             <Route path="/admin" element={<AdminLogin />} />
             <Route path="/admin/dashboard" element={
               <ProtectedRoute requiredRole="super_admin">
@@ -156,6 +181,9 @@ const App = () => (
               </ProtectedRoute>
             } />
             <Route path="/admin/setup" element={<AdminSetup />} />
+            
+            {/* Navigation Help */}
+            <Route path="/help" element={<NavigationHelp />} />
             
             {/* Catch-all route */}
             <Route path="*" element={<NotFound />} />

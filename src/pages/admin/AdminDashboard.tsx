@@ -6,12 +6,22 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { useLogout } from "@/hooks/use-logout";
-import { Loader2, ShieldCheck, Users, CheckCircle2, XCircle, LogOut, FileText, UserPlus, Edit, Trash2 } from "lucide-react";
+import { Loader2, ShieldCheck, Users, CheckCircle2, XCircle, LogOut, FileText, UserPlus, Edit, Trash2, User } from "lucide-react";
+import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
+import { UniversalSidebar } from "@/components/layout/UniversalSidebar";
 import { AddUserDialog } from "@/components/admin/AddUserDialog";
 import { EditUserDialog } from "@/components/admin/EditUserDialog";
 import { DeleteUserDialog } from "@/components/admin/DeleteUserDialog";
+import { Link } from "react-router-dom";
 
 type AppRole = "super_admin" | "admin" | "mentor" | "candidate";
 
@@ -362,13 +372,43 @@ export default function AdminDashboard() {
           <h1 className="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
           <p className="text-muted-foreground">Manage users and approve onboarding requests.</p>
         </div>
-        <Button variant="outline" onClick={logout}>
-          <LogOut className="h-4 w-4 mr-2" />
-          Sign out
-        </Button>
+        <div className="flex gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                <User className="h-4 w-4 mr-2" />
+                My Profile
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem asChild>
+                <Link to="/profile/edit">
+                  <User className="h-4 w-4 mr-2" />
+                  Edit Profile
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={logout}>
+                <LogOut className="h-4 w-4 mr-2" />
+                Sign Out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </header>
 
-      <Tabs defaultValue="users">
+      {/* Breadcrumbs */}
+      <Breadcrumbs />
+      
+      <div className="flex gap-8 min-h-[calc(100vh-200px)]">
+        {/* Left Sidebar - Universal Navigation */}
+        <div className="w-64 flex-shrink-0">
+          <UniversalSidebar />
+        </div>
+        
+        {/* Main Content */}
+        <div className="flex-1">
+          <Tabs defaultValue="users">
         <TabsList>
           <TabsTrigger value="users" className="flex items-center gap-2"><Users className="h-4 w-4"/> Users</TabsTrigger>
           <TabsTrigger value="all-requests" className="flex items-center gap-2"><FileText className="h-4 w-4"/> All Requests</TabsTrigger>
@@ -618,6 +658,8 @@ export default function AdminDashboard() {
           </Card>
         </TabsContent>
       </Tabs>
+          </div>
+        </div>
 
       {/* User Management Dialogs */}
       <AddUserDialog 

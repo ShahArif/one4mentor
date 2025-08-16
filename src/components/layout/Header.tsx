@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { 
   Menu, 
@@ -11,27 +11,133 @@ import {
   User,
   BookOpen,
   Users,
-  MessageCircle
+  MessageCircle,
+  Settings,
+  LogOut,
+  Calendar,
+  FileText,
+  BarChart3,
+  Shield,
+  GraduationCap,
+  Briefcase,
+  Target,
+  MessageSquare,
+  Video,
+  Star,
+  TrendingUp
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 export function Header() {
   const [isOpen, setIsOpen] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const location = useLocation();
-  
-  // Mock authentication state - will be replaced with real auth
-  const isAuthenticated = false;
-  const userRole = "candidate"; // candidate | mentor | admin
+  const navigate = useNavigate();
+  const { user, signOut } = useAuth();
+  const { toast } = useToast();
 
-  const navigation = [
+  useEffect(() => {
+    if (user) {
+      fetchUserRole();
+    } else {
+      setUserRole(null);
+      setIsLoading(false);
+    }
+  }, [user]);
+
+  const fetchUserRole = async () => {
+    try {
+      const { data: userRoleData, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user?.id)
+        .single();
+
+      if (error) {
+        console.error('Error fetching user role:', error);
+        setUserRole(null);
+      } else {
+        setUserRole(userRoleData?.role || null);
+      }
+    } catch (error) {
+      console.error('Error fetching user role:', error);
+      setUserRole(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      navigate('/');
+      toast({
+        title: "Signed out successfully",
+        description: "You have been logged out of your account.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error signing out",
+        description: "There was an issue signing you out.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Public navigation items
+  const publicNavigation = [
     { name: "Find Mentors", href: "/mentors", icon: Users },
-    { name: "Mock Interviews", href: "/interviews", icon: MessageCircle },
-    { name: "Courses", href: "/courses", icon: BookOpen },
     { name: "About", href: "/about" },
+    { name: "Help", href: "/help", icon: BookOpen },
   ];
 
+  // Role-based navigation items
+  const getRoleNavigation = () => {
+    if (!userRole) return [];
+
+    switch (userRole) {
+      case 'candidate':
+        return [
+          { name: "My Requests", href: "/candidate/requests", icon: FileText },
+          { name: "Sessions", href: "/sessions", icon: Calendar },
+          { name: "Find Mentors", href: "/mentors", icon: Users },
+          { name: "Chat", href: "/chat", icon: MessageSquare },
+          { name: "Video Calls", href: "/video-call", icon: Video },
+          { name: "Feedback", href: "/session-feedback", icon: Star },
+          { name: "Reviews", href: "/reviews", icon: Star },
+          { name: "Analytics", href: "/analytics", icon: TrendingUp },
+          { name: "Help", href: "/help", icon: BookOpen },
+        ];
+      case 'mentor':
+        return [
+          { name: "Requests", href: "/mentor/requests", icon: FileText },
+          { name: "Sessions", href: "/sessions", icon: Calendar },
+          { name: "Chat", href: "/chat", icon: MessageSquare },
+          { name: "Video Calls", href: "/video-call", icon: Video },
+          { name: "Reviews", href: "/reviews", icon: Star },
+          { name: "Analytics", href: "/analytics", icon: TrendingUp },
+          { name: "Help", href: "/help", icon: BookOpen },
+        ];
+      case 'super_admin':
+        return [
+          { name: "User Management", href: "/admin/users", icon: Users },
+          { name: "Analytics", href: "/analytics", icon: BarChart3 },
+          { name: "Settings", href: "/admin/settings", icon: Settings },
+          { name: "Help", href: "/help", icon: BookOpen },
+        ];
+      default:
+        return [];
+    }
+  };
+
   const isActive = (path: string) => location.pathname === path;
+
+  const currentNavigation = userRole ? getRoleNavigation() : publicNavigation;
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -39,20 +145,20 @@ export function Header() {
         {/* Logo */}
         <Link to="/" className="flex items-center space-x-2">
           <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">P</span>
+            <span className="text-white font-bold text-sm">O</span>
           </div>
-          <span className="font-bold text-xl">Preplaced</span>
+          <span className="font-bold text-xl">One4Mentor</span>
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center space-x-8">
-          {navigation.map((item) => {
+        <nav className="hidden md:flex items-center space-x-6">
+          {currentNavigation.map((item) => {
             const Icon = item.icon;
             return (
               <Link
                 key={item.name}
                 to={item.href}
-                className={`flex items-center space-x-1 text-sm font-medium transition-smooth hover:text-primary ${
+                className={`flex items-center space-x-2 text-sm font-medium transition-smooth hover:text-primary ${
                   isActive(item.href) ? "text-primary" : "text-muted-foreground"
                 }`}
               >
@@ -70,7 +176,7 @@ export function Header() {
             <Search className="h-4 w-4" />
           </Button>
 
-          {isAuthenticated ? (
+          {user && !isLoading ? (
             <>
               {/* Notifications */}
               <Button variant="ghost" size="icon" className="relative">
@@ -79,21 +185,53 @@ export function Header() {
                   variant="destructive" 
                   className="absolute -top-1 -right-1 w-5 h-5 p-0 flex items-center justify-center text-xs"
                 >
-                  3
+                  0
                 </Badge>
               </Button>
 
-              {/* Dashboard Link */}
-              <Button variant="ghost" asChild>
-                <Link to={userRole === "mentor" ? "/mentor/dashboard" : "/candidate/dashboard"} className="hidden md:flex">
-                  Dashboard
-                </Link>
-              </Button>
-
-              {/* Profile */}
-              <Button variant="ghost" size="icon">
-                <User className="h-4 w-4" />
-              </Button>
+              {/* Profile Dropdown */}
+              <div className="relative group">
+                <Button variant="ghost" size="icon">
+                  <User className="h-4 w-4" />
+                </Button>
+                
+                {/* Profile Dropdown Menu */}
+                <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                  <div className="py-2">
+                    <div className="px-4 py-2 border-b">
+                      <p className="text-sm font-medium text-gray-900">{user.email}</p>
+                      <p className="text-xs text-gray-500 capitalize">{userRole}</p>
+                    </div>
+                    
+                    <div className="py-1">
+                      <Link
+                        to="/profile/edit"
+                        className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        <User className="h-4 w-4 mr-2" />
+                        My Profile
+                      </Link>
+                      <Link
+                        to="/settings"
+                        className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        <Settings className="h-4 w-4 mr-2" />
+                        Settings
+                      </Link>
+                    </div>
+                    
+                    <div className="border-t py-1">
+                      <button
+                        onClick={handleSignOut}
+                        className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                      >
+                        <LogOut className="h-4 w-4 mr-2" />
+                        Sign Out
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </>
           ) : (
             <>
@@ -122,7 +260,16 @@ export function Header() {
             </SheetTrigger>
             <SheetContent side="right" className="w-80">
               <div className="flex flex-col space-y-4 mt-6">
-                {navigation.map((item) => {
+                {/* User Info */}
+                {user && (
+                  <div className="p-4 bg-gray-50 rounded-lg">
+                    <p className="text-sm font-medium text-gray-900">{user.email}</p>
+                    <p className="text-xs text-gray-500 capitalize">{userRole}</p>
+                  </div>
+                )}
+
+                {/* Navigation Items */}
+                {currentNavigation.map((item) => {
                   const Icon = item.icon;
                   return (
                     <Link
@@ -141,7 +288,7 @@ export function Header() {
                   );
                 })}
                 
-                {!isAuthenticated && (
+                {!user ? (
                   <>
                     <div className="border-t pt-4 space-y-2">
                       <Button variant="outline" className="w-full" asChild>
@@ -156,6 +303,37 @@ export function Header() {
                           Join Now
                         </Link>
                       </Button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="border-t pt-4 space-y-2">
+                      <Link
+                        to="/profile/edit"
+                        onClick={() => setIsOpen(false)}
+                        className="flex items-center w-full p-3 text-sm text-gray-700 hover:bg-gray-100 rounded-lg"
+                      >
+                        <User className="h-4 w-4 mr-2" />
+                        My Profile
+                      </Link>
+                      <Link
+                        to="/settings"
+                        onClick={() => setIsOpen(false)}
+                        className="flex items-center w-full p-3 text-sm text-gray-700 hover:bg-gray-100 rounded-lg"
+                      >
+                        <Settings className="h-4 w-4 mr-2" />
+                        Settings
+                      </Link>
+                      <button
+                        onClick={() => {
+                          handleSignOut();
+                          setIsOpen(false);
+                        }}
+                        className="flex items-center w-full p-3 text-sm text-red-600 hover:bg-red-50 rounded-lg"
+                      >
+                        <LogOut className="h-4 w-4 mr-2" />
+                        Sign Out
+                      </button>
                     </div>
                   </>
                 )}
